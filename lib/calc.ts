@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import { useKpiStore } from './store'
+import { useKpiStore, CalcResult } from './store'
 
 function getColIndexById(id: string): number {
   const { headers } = useKpiStore.getState()
