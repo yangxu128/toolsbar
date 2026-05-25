@@ -80,7 +80,7 @@ export default function XmlPage() {
           <DataTable headers={headers} data={pagedData} showFilters={showFilters} colFilters={colFilters} onColFilterChange={setColFilter} />
           <Pagination total={filteredData.length} page={safePage} pageSize={pageSize} totalPages={totalPages}
             onPageChange={(p: number) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-            onPageSizeChange={(sz) => { setPageSize(sz); setPage(1) }} />
+            onPageSizeChange={(sz: number) => { setPageSize(sz); setPage(1) }} />
           <button onClick={() => useXmlStore.getState().clearData()}
             className="mt-3 flex items-center gap-1 text-[11px] text-muted hover:text-red-500 transition-colors">
             <X className="w-3 h-3" /> 清除数据，重新上传
