@@ -55,7 +55,7 @@ export default function XmlPage() {
     if (!headers.length || !filteredData.length) return
     const csvRows = [
       headers.join(','),
-      ...filteredData.map(row => headers.map(h => { const v = row[h] || ''; return typeof v === 'string' && /[,"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v }).join(','))
+      ...filteredData.map((row: Record<string, string>) => headers.map((h: string) => { const v = row[h] || ''; return typeof v === 'string' && /[,"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v }).join(','))
     ]
     const blob = new Blob(['\ufeff' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const a = document.createElement('a')
@@ -153,11 +153,11 @@ function DataTable({ headers, data, showFilters, colFilters, onColFilterChange }
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-20">
             <tr className="bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
-              {headers.map(h => (<th key={h} className="px-3 py-2 font-medium text-left whitespace-nowrap min-w-[100px]">{h}</th>))}
+              {headers.map((h: string) => (<th key={h} className="px-3 py-2 font-medium text-left whitespace-nowrap min-w-[100px]">{h}</th>))}
             </tr>
             {showFilters && (
               <tr className="bg-[hsl(var(--muted))]">
-                {headers.map(h => (
+                {headers.map((h: string) => (
                   <td key={`f-${h}`} className="px-1.5 py-1">
                     <input placeholder={`筛选...`} value={colFilters[h] || ''} onChange={(e) => onColFilterChange(h, e.target.value)}
                       className="w-full px-2 py-0.5 rounded border border-[hsl(var(--border))] text-[11px] outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] placeholder:text-muted" />
@@ -206,7 +206,7 @@ function Pagination({ total, page, pageSize, totalPages, onPageChange, onPageSiz
         </div>
         <div className="flex items-center gap-0.5">
           <button disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="p-1 rounded-md hover:bg-[hsl(var(--muted))] disabled:opacity-30"><ChevronLeft className="w-3.5 h-3.5" /></button>
-          {pages.map(p => (
+          {pages.map((p: number) => (
             <button key={p} onClick={() => onPageChange(p)}
               className={`min-w-[24px] px-1.5 py-0.5 rounded-md text-[11px] font-medium transition-colors ${p === page ? 'bg-[hsl(var(--primary))] text-white' : 'hover:bg-[hsl(var(--muted))] text-muted'}`}>{p}</button>
           ))}
