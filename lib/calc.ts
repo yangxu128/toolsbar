@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import { useKpiStore, CalcResult } from './store'
+import { useKpiStore, CalcResult, MetricDef } from './store'
 
 function getColIndexById(id: string): number {
   const { headers } = useKpiStore.getState()
@@ -17,7 +17,7 @@ function parseValue(v: any): number | null {
   return isNaN(n) ? null : n
 }
 
-export function evaluateFormula(formula: string, rowIdx: number) {
+export function evaluateFormula(formula: string, rowIdx: number): CalcResult | null {
   if (!formula) return null
   const { rows } = useKpiStore.getState()
   const row = rows[rowIdx]
@@ -63,6 +63,7 @@ export function calcAll(rowIdx: number): CalcResult[] {
     seen.add(id)
     if (!def.formula) continue
     const r = evaluateFormula(def.formula, rowIdx)
+    if (!r) continue
     results.push({ id, desc: def.desc, formula: def.formula, ...r })
   }
 
