@@ -79,7 +79,7 @@ export default function XmlPage() {
             showFilters={showFilters} onToggleFilter={() => setShowFilters(!showFilters)} onExport={handleExport} />
           <DataTable headers={headers} data={pagedData} showFilters={showFilters} colFilters={colFilters} onColFilterChange={setColFilter} />
           <Pagination total={filteredData.length} page={safePage} pageSize={pageSize} totalPages={totalPages}
-            onPageChange={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+            onPageChange={(p: number) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
             onPageSizeChange={(sz) => { setPageSize(sz); setPage(1) }} />
           <button onClick={() => useXmlStore.getState().clearData()}
             className="mt-3 flex items-center gap-1 text-[11px] text-muted hover:text-red-500 transition-colors">
