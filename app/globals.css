@@ -1,0 +1,139 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 98%;
+  --foreground: 220 20% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 20% 10%;
+  --primary: 220 90% 56%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 220 20% 10%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 10% 50%;
+  --accent: 220 90% 56%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 13% 90%;
+  --input: 220 13% 90%;
+  --ring: 220 90% 56%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 220 20% 6%;
+  --foreground: 0 0% 95%;
+  --card: 220 18% 10%;
+  --card-foreground: 0 0% 95%;
+  --primary: 220 90% 60%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 14% 14%;
+  --secondary-foreground: 0 0% 95%;
+  --muted: 220 14% 14%;
+  --muted-foreground: 220 10% 55%;
+  --accent: 220 90% 60%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 14% 18%;
+  --input: 220 14% 18%;
+  --ring: 220 90% 60%;
+}
+
+* {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+table, thead, tbody, tr, th, td,
+.card-dark, .glass-dark, .glass-light,
+header, footer, input, select, button,
+[class*="divide-"] > * {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(260 80% 60%) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.bg-grid-light {
+  background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.04) 1px, transparent 0);
+  background-size: 32px 32px;
+}
+
+.bg-grid-dark {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0);
+  background-size: 32px 32px;
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.glass-dark {
+  background: rgba(15, 17, 24, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.card-dark {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+}
+
+.input-dark {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+.input-dark::placeholder { color: hsl(var(--muted-foreground)); }
+.input-dark:focus {
+  outline: none;
+  border-color: hsl(var(--ring));
+}
+
+.tag-dark {
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border));
+}
+
+kbd {
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border));
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.text-muted { color: hsl(var(--muted-foreground)); }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb { background: hsl(220 14% 22%); }
+
+::selection { background: hsl(var(--primary) / 0.15); }
