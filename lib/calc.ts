@@ -123,5 +123,5 @@ export function parseExcel(buffer: ArrayBuffer) {
     })
   }
 
-  return { headers, rows: dataRows, metrics: metricList }
+  return { headers, rows: dataRows as any[][], metrics: metricList }
 }
