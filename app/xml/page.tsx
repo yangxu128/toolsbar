@@ -6,6 +6,7 @@ import { UploadCloud, Search, Filter, Download, ChevronLeft, ChevronRight as Che
 import { useXmlStore } from '@/lib/xml-store'
 import { parseXmlFile } from '@/lib/xml-parser'
 import { useFavStore } from '@/lib/fav-store'
+import UnifiedTable from '@/components/unified-table'
 
 export default function XmlPage() {
   const loaded = useXmlStore((s) => s.loaded)
@@ -69,6 +70,12 @@ export default function XmlPage() {
     a.click()
   }
 
+  const columns = headers.map(h => ({
+    key: h,
+    title: h,
+    width: 140,
+  }))
+
   return (
     <div>
       {/* Breadcrumb */}
@@ -112,10 +119,15 @@ export default function XmlPage() {
             <>
               <ToolBar fileName={fileName} rowCount={allData.length} search={search} onSearchChange={setSearch}
                 showFilters={showFilters} onToggleFilter={() => setShowFilters(!showFilters)} onExport={handleExport} />
-              <DataTable headers={headers} data={pagedData} showFilters={showFilters} colFilters={colFilters} onColFilterChange={setColFilter} />
-              <Pagination total={filteredData.length} page={safePage} pageSize={pageSize} totalPages={totalPages}
-                onPageChange={(p: number) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-                onPageSizeChange={(sz: number) => { setPageSize(sz); setPage(1) }} />
+              <UnifiedTable
+                columns={columns}
+                data={pagedData}
+                pagination
+                pageSize={pageSize}
+                pageSizeOptions={[10, 20, 50, 100]}
+                showTotal
+                className="mb-3"
+              />
               <button onClick={() => useXmlStore.getState().clearData()}
                 className="mt-3 flex items-center gap-1 text-[11px] text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors">
                 <X className="w-3 h-3" /> 清除数据，重新上传
@@ -183,77 +195,6 @@ function ToolBar({ fileName, rowCount, search, onSearchChange, showFilters, onTo
         <Filter className="w-3 h-3" /> 列筛选
       </button>
       <span className="text-[11px] text-[hsl(var(--muted-foreground))] whitespace-nowrap">{rowCount.toLocaleString()} 条</span>
-    </div>
-  )
-}
-
-function DataTable({ headers, data, showFilters, colFilters, onColFilterChange }: any) {
-  return (
-    <div className="card-dark rounded-lg overflow-hidden">
-      <div className="overflow-auto max-h-[calc(100vh-340px)]">
-        <table className="w-full text-xs">
-          <thead className="sticky top-0 z-20">
-            <tr className="bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
-              {headers.map((h: string) => (<th key={h} className="px-3 py-2 font-medium text-left whitespace-nowrap min-w-[100px]">{h}</th>))}
-            </tr>
-            {showFilters && (
-              <tr className="bg-[hsl(var(--muted))]">
-                {headers.map((h: string) => (
-                  <td key={`f-${h}`} className="px-1.5 py-1">
-                    <input placeholder={`筛选...`} value={colFilters[h] || ''} onChange={(e) => onColFilterChange(h, e.target.value)}
-                      className="w-full px-2 py-0.5 rounded border border-[hsl(var(--border))] text-[11px] outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]" />
-                  </td>
-                ))}
-              </tr>
-            )}
-          </thead>
-          <tbody className="divide-y divide-[hsl(var(--border))]">
-            {data.map((row: any, ri: number) => (
-              <tr key={ri} className="hover:bg-[hsl(var(--muted))]">
-                {headers.map((h: string) => (
-                  <td key={`${ri}-${h}`} className="px-3 py-1.5 text-[hsl(var(--muted-foreground))] whitespace-nowrap truncate max-w-[200px]" title={row[h]}>{row[h] ?? ''}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-function Pagination({ total, page, pageSize, totalPages, onPageChange, onPageSizeChange }: any) {
-  const pages = (() => {
-    const maxVis = 7
-    let start = Math.max(1, page - Math.floor(maxVis / 2))
-    let end = Math.min(totalPages, start + maxVis - 1)
-    if (end - start + 1 < maxVis) start = Math.max(1, end - maxVis + 1)
-    const arr: number[] = []
-    for (let i = start; i <= end; i++) arr.push(i)
-    return arr
-  })()
-
-  return (
-    <div className="card-dark rounded-lg mt-3 px-3 py-2 flex items-center justify-between">
-      <div className="text-[11px] text-[hsl(var(--muted-foreground))]">共 <strong className="text-[hsl(var(--foreground))]">{total}</strong> 条，第 <strong className="text-[hsl(var(--foreground))]">{page}</strong>/<strong className="text-[hsl(var(--foreground))]">{totalPages}</strong> 页</div>
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5 text-[11px] text-[hsl(var(--muted-foreground))]">
-          每页
-          <select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            className="px-1.5 py-0.5 rounded-md border border-[hsl(var(--border))] text-[11px] outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
-            {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-          条
-        </div>
-        <div className="flex items-center gap-0.5">
-          <button disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="p-1 rounded-md hover:bg-[hsl(var(--muted))] disabled:opacity-30"><ChevronLeft className="w-3.5 h-3.5" /></button>
-          {pages.map((p: number) => (
-            <button key={p} onClick={() => onPageChange(p)}
-              className={`min-w-[24px] px-1.5 py-0.5 rounded-md text-[11px] font-medium transition-colors ${p === page ? 'bg-[hsl(var(--primary))] text-white' : 'hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>{p}</button>
-          ))}
-          <button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="p-1 rounded-md hover:bg-[hsl(var(--muted))] disabled:opacity-30"><ChevronRightIcon className="w-3.5 h-3.5" /></button>
-        </div>
-      </div>
     </div>
   )
 }

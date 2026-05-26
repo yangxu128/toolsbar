@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { GitCompareArrows, Loader2 } from 'lucide-react'
 import { useKpiStore } from '@/lib/store'
 import { compareRows } from '@/lib/calc'
+import UnifiedTable from './unified-table'
 
 function fmt(n: any) {
   if (n === null || n === undefined) return '-'
@@ -29,17 +30,25 @@ export default function CompareView() {
     <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${
       v > 0 ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
       v < 0 ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
-      'bg-[hsl(var(--secondary))] text-muted'
+      'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]'
     }`}>
       {v > 0 ? '+' : ''}{v}%
     </span>
   )
 
+  const columns = result ? [
+    { key: 'id', title: '指标', width: 160 },
+    { key: 'a', title: result.nameA, align: 'right' as const, render: (v: any) => <span className="tabular-nums text-xs">{fmt(v)}</span> },
+    { key: 'b', title: result.nameB, align: 'right' as const, render: (v: any) => <span className="tabular-nums text-xs">{fmt(v)}</span> },
+    { key: 'diff', title: '差值', align: 'right' as const, width: 100, render: (v: any) => <span className="tabular-nums font-medium text-xs">{v > 0 ? '+' : ''}{fmt(v)}</span> },
+    { key: 'pct', title: '变化率', align: 'center' as const, width: 90, render: (v: any) => renderPct(v) },
+  ] : []
+
   return (
     <div className="space-y-3">
-      <div className="card-dark rounded-lg p-3 flex items-end gap-3 flex-wrap">
+      <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] p-4 flex items-end gap-3 flex-wrap">
         <div className="flex-1 min-w-[180px]">
-          <label className="block text-[11px] font-medium text-muted mb-1">行 A</label>
+          <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">行 A</label>
           <select value={rowA ?? ''} onChange={e => setRowA(e.target.value ? Number(e.target.value) : null)}
             className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
             <option value="">选择...</option>
@@ -47,7 +56,7 @@ export default function CompareView() {
           </select>
         </div>
         <div className="flex-1 min-w-[180px]">
-          <label className="block text-[11px] font-medium text-muted mb-1">行 B</label>
+          <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">行 B</label>
           <select value={rowB ?? ''} onChange={e => setRowB(e.target.value ? Number(e.target.value) : null)}
             className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
             <option value="">选择...</option>
@@ -67,47 +76,27 @@ export default function CompareView() {
       {result && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="card-dark rounded-lg p-4">
+            <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] p-4">
               <h3 className="text-xs font-medium text-[hsl(var(--primary))] mb-0.5">{result.nameA}</h3>
-              <p className="text-[11px] text-muted">对比基准</p>
+              <p className="text-[11px] text-[hsl(var(--muted-foreground))]">对比基准</p>
             </div>
-            <div className="card-dark rounded-lg p-4">
-              <h3 className="text-xs font-medium text-muted mb-0.5">{result.nameB}</h3>
-              <p className="text-[11px] text-muted">对比目标</p>
+            <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] p-4">
+              <h3 className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-0.5">{result.nameB}</h3>
+              <p className="text-[11px] text-[hsl(var(--muted-foreground))]">对比目标</p>
             </div>
           </div>
 
-          <div className="card-dark rounded-lg overflow-hidden">
-            <div className="overflow-auto max-h-[calc(100vh-380px)]">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10">
-                  <tr className="bg-[hsl(var(--card))]">
-                    <th className="px-3 py-2 text-left font-medium w-[140px] text-[hsl(var(--foreground))]">指标</th>
-                    <th className="px-3 py-2 text-right font-medium text-[hsl(var(--foreground))]">{result.nameA}</th>
-                    <th className="px-3 py-2 text-right font-medium text-[hsl(var(--foreground))]">{result.nameB}</th>
-                    <th className="px-3 py-2 text-right font-medium w-[90px] text-[hsl(var(--foreground))]">差值</th>
-                    <th className="px-3 py-2 text-center font-medium w-[80px] text-[hsl(var(--foreground))]">变化率</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[hsl(var(--border))]">
-                  {result.diffs.map((d: any, i: number) => (
-                    <tr key={i} className="hover:bg-[hsl(var(--muted))]">
-                      <td className="px-3 py-2 font-mono text-[hsl(var(--primary))] font-medium text-[11px]">{d.id}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-muted text-xs">{fmt(d.a)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-muted text-xs">{fmt(d.b)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-medium text-xs">{d.diff > 0 ? '+' : ''}{fmt(d.diff)}</td>
-                      <td className="px-3 py-2 text-center">{renderPct(d.pct)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <UnifiedTable
+            columns={columns}
+            data={result.diffs}
+            searchable
+            showTotal
+          />
         </>
       )}
 
       {!result && (
-        <div className="text-center py-16 text-muted">
+        <div className="text-center py-16 text-[hsl(var(--muted-foreground))]">
           <GitCompareArrows className="w-10 h-10 mx-auto mb-2 opacity-20" />
           <p className="text-sm">选择两行数据进行指标差异对比分析</p>
         </div>
