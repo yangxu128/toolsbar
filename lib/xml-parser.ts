@@ -4,6 +4,11 @@ export interface ParsedXml {
 }
 
 export function parseXmlFile(text: string): ParsedXml {
+  const trimmed = text.trim()
+  if (trimmed.startsWith('dn|') || trimmed.includes('\n') && trimmed.split('\n')[0].includes('|')) {
+    return parseCsvPipe(trimmed)
+  }
+
   const parser = new DOMParser()
   const doc = parser.parseFromString(text, 'text/xml')
 
@@ -19,6 +24,23 @@ export function parseXmlFile(text: string): ParsedXml {
   if (type2) return type2
 
   return tryType3(root)
+}
+
+function parseCsvPipe(text: string): ParsedXml {
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0)
+  if (lines.length < 2) throw new Error('CSV文件没有足够的数据行')
+
+  const headers = lines[0].split('|')
+  const data: Record<string, string>[] = []
+
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split('|')
+    const row: Record<string, string> = {}
+    headers.forEach((h, idx) => { row[h] = values[idx] || '' })
+    data.push(row)
+  }
+
+  return { headers, data }
 }
 
 function tryType1(root: Element): ParsedXml | null {
@@ -66,15 +88,28 @@ function tryType2(root: Element): ParsedXml | null {
 
   if (!smrElements.length || !objectElements.length) return null
 
-  const headers = (smrElements[0].textContent || '').trim().split(/\s+/)
+  const smrHeaders = (smrElements[0].textContent || '').trim().split(/\s+/)
+
+  const objAttrNames: string[] = []
+  if (objectElements[0]) {
+    for (const attr of Array.from(objectElements[0].attributes)) {
+      if (attr.name && !objAttrNames.includes(attr.name)) {
+        objAttrNames.push(attr.name)
+      }
+    }
+  }
+
+  const headers = [...objAttrNames, ...smrHeaders]
   const data: Record<string, string>[] = []
 
   objectElements.forEach((obj) => {
+    const baseRow: Record<string, string> = {}
+    objAttrNames.forEach(attr => { baseRow[attr] = obj.getAttribute(attr) || '' })
+
     obj.querySelectorAll(':scope > v').forEach((vElem) => {
       const values = (vElem.textContent || '').trim().split(/\s+/)
-      if (values.length !== headers.length) return
-      const row: Record<string, string> = {}
-      headers.forEach((h, i) => { row[h] = values[i] || '' })
+      const row: Record<string, string> = { ...baseRow }
+      smrHeaders.forEach((h, i) => { row[h] = values[i] || '' })
       data.push(row)
     })
   })

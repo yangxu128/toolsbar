@@ -118,25 +118,25 @@ function UploadArea({ onUpload, error }: { onUpload: (f: File) => void; error: s
     <div className="max-w-2xl mx-auto">
       <div onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
-        onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f?.name.match(/\.xml$/i)) onUpload(f) }}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f?.name.match(/\.(xml|csv)$/i)) onUpload(f) }}
         onClick={() => document.getElementById('xml-file-input')?.click()}
         className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors ${
           dragging ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)]' : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary))]'
         }`}>
-        <input id="xml-file-input" type="file" accept=".xml"
+        <input id="xml-file-input" type="file" accept=".xml,.csv"
           onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} className="hidden" />
         <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-4">
           <UploadCloud className="w-8 h-8 text-blue-600" />
         </div>
-        <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] mb-2">拖拽 XML 文件到此处</h3>
-        <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">点击或拖拽 .xml 文件到此区域</p>
+        <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] mb-2">拖拽 XML / CSV 文件到此处</h3>
+        <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">点击或拖拽 .xml / .csv 文件到此区域</p>
         <button className="px-4 py-2 bg-[hsl(var(--primary))] text-white rounded-lg font-medium text-sm hover:opacity-90 active:scale-[0.97] transition-all">
           选择文件
         </button>
       </div>
       {error && <div className="mt-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-xs">{error}</div>}
       <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))]">
-        <p className="flex items-center gap-2"><FileCode className="w-4 h-4" /> 支持结构：FieldName/FieldValue · smr/v · 通用标签</p>
+        <p className="flex items-center gap-2"><FileCode className="w-4 h-4" /> 支持结构：FieldName/FieldValue · smr/v · 通用标签 · CSV(|分隔)</p>
       </div>
     </div>
   )
