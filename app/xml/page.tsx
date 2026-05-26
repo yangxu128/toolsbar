@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import { UploadCloud, Search, Filter, Download, ChevronLeft, ChevronRight, FileCode, X } from 'lucide-react'
+import Link from 'next/link'
+import { UploadCloud, Search, Filter, Download, ChevronLeft, ChevronRight as ChevronRightIcon, FileCode, X, Home, Star } from 'lucide-react'
 import { useXmlStore } from '@/lib/xml-store'
 import { parseXmlFile } from '@/lib/xml-parser'
+import { useFavStore } from '@/lib/fav-store'
 
 export default function XmlPage() {
   const loaded = useXmlStore((s) => s.loaded)
@@ -11,6 +13,9 @@ export default function XmlPage() {
   const allData = useXmlStore((s) => s.data)
   const fileName = useXmlStore((s) => s.fileName)
   const loadXml = useXmlStore((s) => s.loadXml)
+  const isFav = useFavStore((s) => s.isFav)
+  const toggleFav = useFavStore((s) => s.toggleFav)
+  const fav = isFav('xml-reader')
 
   const [search, setSearch] = useState('')
   const [colFilters, setColFilters] = useState<Record<string, string>>({})
@@ -55,7 +60,7 @@ export default function XmlPage() {
     if (!headers.length || !filteredData.length) return
     const csvRows = [
       headers.join(','),
-      ...filteredData.map((row: Record<string, string>) => headers.map((h: string) => { const v = row[h] || ''; return typeof v === 'string' && /[,"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v }).join(','))
+      ...filteredData.map((row: Record<string, string>) => headers.map((h: string) => { const v = row[h] || ''; return typeof v === 'string' && /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v }).join(','))
     ]
     const blob = new Blob(['\ufeff' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const a = document.createElement('a')
@@ -66,27 +71,59 @@ export default function XmlPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold">XML在线阅读器</h2>
-        <p className="text-sm text-muted mt-0.5">支持多种XML结构自动识别，提供搜索、列筛选、分页浏览、导出功能</p>
-      </div>
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 text-sm mb-6 text-[hsl(var(--muted-foreground))]">
+        <Link href="/" className="hover:text-[hsl(var(--primary))] transition-colors flex items-center gap-1">
+          <Home className="w-4 h-4" />首页
+        </Link>
+        <ChevronRightIcon className="w-4 h-4" />
+        <span>开发工具</span>
+        <ChevronRightIcon className="w-4 h-4" />
+        <span className="text-[hsl(var(--foreground))] font-medium">XML在线阅读器</span>
+      </nav>
 
-      {!loaded ? (
-        <UploadArea onUpload={handleUpload} error={errorMsg} />
-      ) : (
-        <>
-          <ToolBar fileName={fileName} rowCount={allData.length} search={search} onSearchChange={setSearch}
-            showFilters={showFilters} onToggleFilter={() => setShowFilters(!showFilters)} onExport={handleExport} />
-          <DataTable headers={headers} data={pagedData} showFilters={showFilters} colFilters={colFilters} onColFilterChange={setColFilter} />
-          <Pagination total={filteredData.length} page={safePage} pageSize={pageSize} totalPages={totalPages}
-            onPageChange={(p: number) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-            onPageSizeChange={(sz: number) => { setPageSize(sz); setPage(1) }} />
-          <button onClick={() => useXmlStore.getState().clearData()}
-            className="mt-3 flex items-center gap-1 text-[11px] text-muted hover:text-red-500 transition-colors">
-            <X className="w-3 h-3" /> 清除数据，重新上传
-          </button>
-        </>
-      )}
+      {/* Tool Header */}
+      <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm mb-6">
+        <div className="p-6 sm:p-8 border-b border-[hsl(var(--border))]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center shrink-0">
+                <FileCode className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-[hsl(var(--foreground))]">XML在线阅读器</h2>
+                <p className="text-[hsl(var(--muted-foreground))] mt-1">支持多种XML结构自动识别，提供搜索、列筛选、分页浏览、导出功能</p>
+              </div>
+            </div>
+            <button
+              onClick={() => toggleFav('xml-reader')}
+              className={`icon-btn shrink-0 ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}
+              title={fav ? '取消收藏' : '收藏'}
+            >
+              <Star className={`w-5 h-5 ${fav ? 'fill-current' : ''}`} />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-8 min-h-[400px]">
+          {!loaded ? (
+            <UploadArea onUpload={handleUpload} error={errorMsg} />
+          ) : (
+            <>
+              <ToolBar fileName={fileName} rowCount={allData.length} search={search} onSearchChange={setSearch}
+                showFilters={showFilters} onToggleFilter={() => setShowFilters(!showFilters)} onExport={handleExport} />
+              <DataTable headers={headers} data={pagedData} showFilters={showFilters} colFilters={colFilters} onColFilterChange={setColFilter} />
+              <Pagination total={filteredData.length} page={safePage} pageSize={pageSize} totalPages={totalPages}
+                onPageChange={(p: number) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                onPageSizeChange={(sz: number) => { setPageSize(sz); setPage(1) }} />
+              <button onClick={() => useXmlStore.getState().clearData()}
+                className="mt-3 flex items-center gap-1 text-[11px] text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors">
+                <X className="w-3 h-3" /> 清除数据，重新上传
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -95,29 +132,33 @@ function UploadArea({ onUpload, error }: { onUpload: (f: File) => void; error: s
   const [dragging, setDragging] = useState(false)
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-2xl mx-auto">
       <div onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f?.name.match(/\.xml$/i)) onUpload(f) }}
         onClick={() => document.getElementById('xml-file-input')?.click()}
-        className={`rounded-lg border border-dashed p-12 text-center cursor-pointer transition-all ${
-          dragging ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-[hsl(var(--ring)/0.4)]'
+        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors ${
+          dragging ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)]' : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary))]'
         }`}>
         <input id="xml-file-input" type="file" accept=".xml"
           onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} className="hidden" />
-        <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-[hsl(160_60%_45%)] flex items-center justify-center">
-          <FileCode className="w-6 h-6 text-white" />
+        <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-4">
+          <UploadCloud className="w-8 h-8 text-blue-600" />
         </div>
-        <h3 className="text-sm font-medium mb-1">上传XML文件</h3>
-        <p className="text-xs text-muted mb-2">点击或拖拽 .xml 文件到此区域</p>
-        <div className="text-[11px] text-muted">
-          <p>支持结构：FieldName/FieldValue · smr/v · 通用标签</p>
-        </div>
+        <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] mb-2">拖拽 XML 文件到此处</h3>
+        <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">点击或拖拽 .xml 文件到此区域</p>
+        <button className="px-4 py-2 bg-[hsl(var(--primary))] text-white rounded-lg font-medium text-sm hover:opacity-90 active:scale-[0.97] transition-all">
+          选择文件
+        </button>
       </div>
 
       {error && (
         <div className="mt-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-xs">{error}</div>
       )}
+
+      <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))]">
+        <p className="flex items-center gap-2"><FileCode className="w-4 h-4" /> 支持结构：FieldName/FieldValue · smr/v · 通用标签</p>
+      </div>
     </div>
   )
 }
@@ -129,19 +170,19 @@ function ToolBar({ fileName, rowCount, search, onSearchChange, showFilters, onTo
         {fileName}
       </span>
       <div className="flex items-center gap-2 ml-auto">
-        <Search className="w-3.5 h-3.5 text-muted" />
+        <Search className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
         <input placeholder="全局搜索..." value={search} onChange={(e) => onSearchChange(e.target.value)}
-          className="w-44 px-2.5 py-1 rounded-md border border-[hsl(var(--border))] text-sm outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] placeholder:text-muted" />
+          className="w-44 px-2.5 py-1 rounded-md border border-[hsl(var(--border))] text-sm outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]" />
       </div>
       <button onClick={onExport}
         className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[hsl(160_60%_45%)] hover:opacity-90 text-white text-xs font-medium transition-opacity">
         <Download className="w-3 h-3" /> 导出CSV
       </button>
       <button onClick={onToggleFilter}
-        className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${showFilters ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--secondary))] text-muted hover:bg-[hsl(var(--border))]'}`}>
+        className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${showFilters ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--border))]'}`}>
         <Filter className="w-3 h-3" /> 列筛选
       </button>
-      <span className="text-[11px] text-muted whitespace-nowrap">{rowCount.toLocaleString()} 条</span>
+      <span className="text-[11px] text-[hsl(var(--muted-foreground))] whitespace-nowrap">{rowCount.toLocaleString()} 条</span>
     </div>
   )
 }
@@ -160,7 +201,7 @@ function DataTable({ headers, data, showFilters, colFilters, onColFilterChange }
                 {headers.map((h: string) => (
                   <td key={`f-${h}`} className="px-1.5 py-1">
                     <input placeholder={`筛选...`} value={colFilters[h] || ''} onChange={(e) => onColFilterChange(h, e.target.value)}
-                      className="w-full px-2 py-0.5 rounded border border-[hsl(var(--border))] text-[11px] outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] placeholder:text-muted" />
+                      className="w-full px-2 py-0.5 rounded border border-[hsl(var(--border))] text-[11px] outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]" />
                   </td>
                 ))}
               </tr>
@@ -170,7 +211,7 @@ function DataTable({ headers, data, showFilters, colFilters, onColFilterChange }
             {data.map((row: any, ri: number) => (
               <tr key={ri} className="hover:bg-[hsl(var(--muted))]">
                 {headers.map((h: string) => (
-                  <td key={`${ri}-${h}`} className="px-3 py-1.5 text-muted whitespace-nowrap truncate max-w-[200px]" title={row[h]}>{row[h] ?? ''}</td>
+                  <td key={`${ri}-${h}`} className="px-3 py-1.5 text-[hsl(var(--muted-foreground))] whitespace-nowrap truncate max-w-[200px]" title={row[h]}>{row[h] ?? ''}</td>
                 ))}
               </tr>
             ))}
@@ -194,9 +235,9 @@ function Pagination({ total, page, pageSize, totalPages, onPageChange, onPageSiz
 
   return (
     <div className="card-dark rounded-lg mt-3 px-3 py-2 flex items-center justify-between">
-      <div className="text-[11px] text-muted">共 <strong className="text-[hsl(var(--foreground))]">{total}</strong> 条，第 <strong className="text-[hsl(var(--foreground))]">{page}</strong>/<strong className="text-[hsl(var(--foreground))]">{totalPages}</strong> 页</div>
+      <div className="text-[11px] text-[hsl(var(--muted-foreground))]">共 <strong className="text-[hsl(var(--foreground))]">{total}</strong> 条，第 <strong className="text-[hsl(var(--foreground))]">{page}</strong>/<strong className="text-[hsl(var(--foreground))]">{totalPages}</strong> 页</div>
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+        <div className="flex items-center gap-1.5 text-[11px] text-[hsl(var(--muted-foreground))]">
           每页
           <select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))}
             className="px-1.5 py-0.5 rounded-md border border-[hsl(var(--border))] text-[11px] outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
@@ -208,9 +249,9 @@ function Pagination({ total, page, pageSize, totalPages, onPageChange, onPageSiz
           <button disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="p-1 rounded-md hover:bg-[hsl(var(--muted))] disabled:opacity-30"><ChevronLeft className="w-3.5 h-3.5" /></button>
           {pages.map((p: number) => (
             <button key={p} onClick={() => onPageChange(p)}
-              className={`min-w-[24px] px-1.5 py-0.5 rounded-md text-[11px] font-medium transition-colors ${p === page ? 'bg-[hsl(var(--primary))] text-white' : 'hover:bg-[hsl(var(--muted))] text-muted'}`}>{p}</button>
+              className={`min-w-[24px] px-1.5 py-0.5 rounded-md text-[11px] font-medium transition-colors ${p === page ? 'bg-[hsl(var(--primary))] text-white' : 'hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>{p}</button>
           ))}
-          <button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="p-1 rounded-md hover:bg-[hsl(var(--muted))] disabled:opacity-30"><ChevronRight className="w-3.5 h-3.5" /></button>
+          <button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="p-1 rounded-md hover:bg-[hsl(var(--muted))] disabled:opacity-30"><ChevronRightIcon className="w-3.5 h-3.5" /></button>
         </div>
       </div>
     </div>
