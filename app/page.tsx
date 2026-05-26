@@ -48,18 +48,17 @@ const tools = [
   {
     id: 'config-center',
     name: '配置管理中心',
-    desc: '统一管理平台配置、工具参数、数据源连接等全局设置项',
+    desc: '统一管理平台配置、工具参数、本地数据存储等全局设置项',
     icon: Settings2,
     color: 'hsl(340 70% 55%)',
     path: '/settings',
-    tags: ['配置管理', '参数设置'],
-    comingSoon: true,
+    tags: ['本地存储', '数据管理'],
   },
 ]
 
 const stats = [
   { icon: Wrench, value: tools.filter(t => !t.comingSoon).length, label: '已收录工具' },
-  { icon: FolderOpen, value: 5, label: '工具分类' },
+  { icon: FolderOpen, value: tools.length, label: '工具分类' },
   { icon: Heart, value: 0, label: '我的收藏' },
   { icon: HardDrive, value: '100%', label: '本地存储' },
 ]

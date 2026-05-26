@@ -34,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/" className="px-3 py-1.5 rounded-md text-sm font-medium text-[hsl(var(--foreground))] bg-[hsl(var(--muted))]">首页</Link>
               <Link href="/kpi" className="px-3 py-1.5 rounded-md text-sm font-medium text-muted hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors">KPI</Link>
               <Link href="/xml" className="px-3 py-1.5 rounded-md text-sm font-medium text-muted hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors">XML</Link>
+              <Link href="/settings" className="px-3 py-1.5 rounded-md text-sm font-medium text-muted hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors">设置</Link>
             </nav>
 
             <button
