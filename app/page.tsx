@@ -108,7 +108,7 @@ export default function Home() {
             {tools.map(tool => {
               const Icon = tool.icon
               const CardContent = (
-                <div className="group relative p-5 rounded-lg card-dark cursor-pointer">
+                <div className="group relative p-5 rounded-lg card-dark cursor-pointer h-[260px] flex flex-col">
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white" style={{ background: tool.color }}>
                       <Icon className="w-5 h-5" />
@@ -123,7 +123,7 @@ export default function Home() {
                   <h3 className="text-sm font-medium mb-1 truncate">{tool.name}</h3>
                   <p className="text-xs leading-relaxed mb-3 line-clamp-2 text-muted min-h-[32px]">{tool.desc}</p>
 
-                  <div className="flex flex-wrap gap-1 mb-3">
+                  <div className="flex flex-wrap gap-1 mb-3 mt-auto">
                     {tool.tags.map(tag => (
                       <span key={tag} className="tag-dark text-[10px] px-2 py-0.5 rounded-full">
                         {tag}
