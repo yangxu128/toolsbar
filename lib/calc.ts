@@ -111,11 +111,11 @@ export function parseExcel(buffer: ArrayBuffer) {
   const sheet0 = wb.Sheets[wb.SheetNames[0]]
   const sheetM = wb.Sheets[wb.SheetNames[1]]
 
-  const raw0 = XLSX.utils.sheet_to_json(sheet0, { header: 1 })
+  const raw0 = XLSX.utils.sheet_to_json(sheet0, { header: 1 }) as any[][]
   const headers = raw0[0] as string[]
   const dataRows = raw0.slice(1)
 
-  const rawM = XLSX.utils.sheet_to_json(sheetM, { header: 1 })
+  const rawM = XLSX.utils.sheet_to_json(sheetM, { header: 1 }) as any[][]
   const mHeaders = rawM[0] as string[]
   const metricList: MetricDef[] = []
 
