@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { UploadCloud, Search, Filter, Download, ChevronLeft, ChevronRight as ChevronRightIcon, FileCode, X, Home, Star } from 'lucide-react'
+import { UploadCloud, Download, FileCode, X, Home, Star, ChevronRight as ChevronRightIcon } from 'lucide-react'
 import { useXmlStore } from '@/lib/xml-store'
 import { parseXmlFile } from '@/lib/xml-parser'
 import { useFavStore } from '@/lib/fav-store'
@@ -17,12 +17,6 @@ export default function XmlPage() {
   const isFav = useFavStore((s) => s.isFav)
   const toggleFav = useFavStore((s) => s.toggleFav)
   const fav = isFav('xml-reader')
-
-  const [search, setSearch] = useState('')
-  const [colFilters, setColFilters] = useState<Record<string, string>>({})
-  const [showFilters, setShowFilters] = useState(false)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
   const [errorMsg, setErrorMsg] = useState('')
 
   const handleUpload = useCallback(async (file: File) => {
@@ -31,37 +25,14 @@ export default function XmlPage() {
       const text = await file.text()
       const result = parseXmlFile(text)
       loadXml(result.headers, result.data, file.name)
-      setPage(1)
-      setColFilters({})
     } catch (e: any) { setErrorMsg(e.message || '解析失败') }
   }, [loadXml])
 
-  const filteredData = useMemo(() => {
-    let data = allData
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      data = data.filter(row => Object.values(row).some(v => String(v).toLowerCase().includes(q)))
-    }
-    Object.entries(colFilters).forEach(([col, val]) => {
-      if (val.trim()) {
-        const q = val.toLowerCase()
-        data = data.filter(row => String(row[col] || '').toLowerCase().includes(q))
-      }
-    })
-    return data
-  }, [allData, search, colFilters])
-
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize))
-  const safePage = Math.min(page, totalPages)
-  const pagedData = filteredData.slice((safePage - 1) * pageSize, safePage * pageSize)
-
-  const setColFilter = (col: string, val: string) => { setColFilters(prev => ({ ...prev, [col]: val })); setPage(1) }
-
   const handleExport = () => {
-    if (!headers.length || !filteredData.length) return
+    if (!headers.length || !allData.length) return
     const csvRows = [
       headers.join(','),
-      ...filteredData.map((row: Record<string, string>) => headers.map((h: string) => { const v = row[h] || ''; return typeof v === 'string' && /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v }).join(','))
+      ...allData.map((row: Record<string, string>) => headers.map((h: string) => { const v = row[h] || ''; return typeof v === 'string' && /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v }).join(','))
     ]
     const blob = new Blob(['\ufeff' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const a = document.createElement('a')
@@ -78,7 +49,6 @@ export default function XmlPage() {
 
   return (
     <div>
-      {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm mb-6 text-[hsl(var(--muted-foreground))]">
         <Link href="/" className="hover:text-[hsl(var(--primary))] transition-colors flex items-center gap-1">
           <Home className="w-4 h-4" />首页
@@ -89,7 +59,6 @@ export default function XmlPage() {
         <span className="text-[hsl(var(--foreground))] font-medium">XML在线阅读器</span>
       </nav>
 
-      {/* Tool Header */}
       <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm mb-6">
         <div className="p-6 sm:p-8 border-b border-[hsl(var(--border))]">
           <div className="flex items-start justify-between gap-4">
@@ -99,14 +68,10 @@ export default function XmlPage() {
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-[hsl(var(--foreground))]">XML在线阅读器</h2>
-                <p className="text-[hsl(var(--muted-foreground))] mt-1">支持多种XML结构自动识别，提供搜索、列筛选、分页浏览、导出功能</p>
+                <p className="text-[hsl(var(--muted-foreground))] mt-1">支持多种XML结构自动识别，提供搜索、分页浏览、导出功能</p>
               </div>
             </div>
-            <button
-              onClick={() => toggleFav('xml-reader')}
-              className={`icon-btn shrink-0 ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}
-              title={fav ? '取消收藏' : '收藏'}
-            >
+            <button onClick={() => toggleFav('xml-reader')} className={`icon-btn shrink-0 ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}>
               <Star className={`w-5 h-5 ${fav ? 'fill-current' : ''}`} />
             </button>
           </div>
@@ -117,20 +82,26 @@ export default function XmlPage() {
             <UploadArea onUpload={handleUpload} error={errorMsg} />
           ) : (
             <>
-              <ToolBar fileName={fileName} rowCount={allData.length} search={search} onSearchChange={setSearch}
-                showFilters={showFilters} onToggleFilter={() => setShowFilters(!showFilters)} onExport={handleExport} />
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium truncate max-w-[280px]" title={fileName}>
+                  {fileName}
+                </span>
+                <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors">
+                  <Download className="w-4 h-4" /> 导出CSV
+                </button>
+              </div>
               <UnifiedTable
                 columns={columns}
-                data={pagedData}
+                data={allData}
+                searchable
+                searchKeys={headers}
                 pagination
-                pageSize={pageSize}
+                pageSize={10}
                 pageSizeOptions={[10, 20, 50, 100]}
                 showTotal
-                className="mb-3"
               />
-              <button onClick={() => useXmlStore.getState().clearData()}
-                className="mt-3 flex items-center gap-1 text-[11px] text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors">
-                <X className="w-3 h-3" /> 清除数据，重新上传
+              <button onClick={() => useXmlStore.getState().clearData()} className="mt-4 flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors">
+                <X className="w-3.5 h-3.5" /> 清除数据，重新上传
               </button>
             </>
           )}
@@ -163,38 +134,10 @@ function UploadArea({ onUpload, error }: { onUpload: (f: File) => void; error: s
           选择文件
         </button>
       </div>
-
-      {error && (
-        <div className="mt-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-xs">{error}</div>
-      )}
-
+      {error && <div className="mt-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-xs">{error}</div>}
       <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))]">
         <p className="flex items-center gap-2"><FileCode className="w-4 h-4" /> 支持结构：FieldName/FieldValue · smr/v · 通用标签</p>
       </div>
-    </div>
-  )
-}
-
-function ToolBar({ fileName, rowCount, search, onSearchChange, showFilters, onToggleFilter, onExport }: any) {
-  return (
-    <div className="card-dark rounded-lg p-3 mb-3 flex items-center gap-2 flex-wrap">
-      <span className="text-[11px] px-2 py-0.5 rounded-full bg-[hsl(var(--primary)/0.08)] text-[hsl(var(--primary))] font-medium truncate max-w-[200px]" title={fileName}>
-        {fileName}
-      </span>
-      <div className="flex items-center gap-2 ml-auto">
-        <Search className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
-        <input placeholder="全局搜索..." value={search} onChange={(e) => onSearchChange(e.target.value)}
-          className="w-44 px-2.5 py-1 rounded-md border border-[hsl(var(--border))] text-sm outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]" />
-      </div>
-      <button onClick={onExport}
-        className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[hsl(160_60%_45%)] hover:opacity-90 text-white text-xs font-medium transition-opacity">
-        <Download className="w-3 h-3" /> 导出CSV
-      </button>
-      <button onClick={onToggleFilter}
-        className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${showFilters ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--border))]'}`}>
-        <Filter className="w-3 h-3" /> 列筛选
-      </button>
-      <span className="text-[11px] text-[hsl(var(--muted-foreground))] whitespace-nowrap">{rowCount.toLocaleString()} 条</span>
     </div>
   )
 }
