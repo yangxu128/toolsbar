@@ -109,22 +109,24 @@ export default function UnifiedTable<T = any>({
     <div className={`bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm overflow-hidden ${className}`}>
       {/* Toolbar */}
       {(searchable || toolbar || showTotal) && (
-        <div className="p-4 border-b border-[hsl(var(--border))] flex items-center gap-3 flex-wrap">
-          {searchable && (
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <Search className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-              <input
-                placeholder="搜索..."
-                value={search}
-                onChange={e => { setSearch(e.target.value); setPage(1) }}
-                className="flex-1 outline-none text-sm bg-transparent text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]"
-              />
-            </div>
-          )}
-          {toolbar && <div className="flex items-center gap-2 ml-auto">{toolbar}</div>}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-[hsl(var(--border))]">
+          <div className="flex items-center gap-2 flex-wrap">
+            {searchable && (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+                <input
+                  placeholder="搜索数据..."
+                  value={search}
+                  onChange={e => { setSearch(e.target.value); setPage(1) }}
+                  className="pl-9 pr-3 py-2 w-64 rounded-lg border border-[hsl(var(--border))] text-sm outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] transition-colors"
+                />
+              </div>
+            )}
+            {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
+          </div>
           {showTotal && (
-            <span className="text-[11px] text-[hsl(var(--muted-foreground))] whitespace-nowrap ml-auto">
-              {paged.length > 0 ? `${(safePage - 1) * size + 1}-${Math.min(safePage * size, filtered.length)} / ` : ''}{filtered.length} 条
+            <span className="text-sm text-[hsl(var(--muted-foreground))]">
+              显示 <strong className="text-[hsl(var(--foreground))]">{filtered.length > 0 ? (safePage - 1) * size + 1 : 0}-{Math.min(safePage * size, filtered.length)}</strong> 条，共 <strong className="text-[hsl(var(--foreground))]">{filtered.length}</strong> 条
             </span>
           )}
         </div>
@@ -132,15 +134,15 @@ export default function UnifiedTable<T = any>({
 
       {/* Table */}
       <div className="overflow-auto max-h-[calc(100vh-340px)]">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 z-20">
-            <tr className="bg-[hsl(var(--card))] border-b border-[hsl(var(--border))]">
+        <table className="w-full border-collapse">
+          <thead className="bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))]">
+            <tr>
               {columns.map(col => (
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className={`px-4 py-3 font-medium text-left whitespace-nowrap text-[hsl(var(--foreground))] select-none ${
-                    col.sortable ? 'cursor-pointer hover:bg-[hsl(var(--muted))]' : ''
+                  className={`px-4 py-3 text-left text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider whitespace-nowrap select-none ${
+                    col.sortable ? 'cursor-pointer hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--border))] transition-colors' : ''
                   }`}
                   style={{ width: col.width, textAlign: col.align || 'left' }}
                 >
@@ -149,9 +151,9 @@ export default function UnifiedTable<T = any>({
                     {col.sortable && (
                       <span className="text-[hsl(var(--muted-foreground))]">
                         {sortKey === col.key ? (
-                          sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                          sortDir === 'asc' ? <ArrowUp className="w-3 h-3 text-[hsl(var(--primary))]" /> : <ArrowDown className="w-3 h-3 text-[hsl(var(--primary))]" />
                         ) : (
-                          <ArrowUpDown className="w-3 h-3 opacity-40" />
+                          <ArrowUpDown className="w-3 h-3 opacity-30" />
                         )}
                       </span>
                     )}
@@ -172,7 +174,7 @@ export default function UnifiedTable<T = any>({
                 <tr
                   key={rowKey ? rowKey(row, ri) : ri}
                   onClick={() => onRowClick?.(row, ri)}
-                  className={`hover:bg-[hsl(var(--muted))] transition-colors ${
+                  className={`transition-colors duration-150 hover:bg-[hsl(var(--muted))] ${
                     onRowClick ? 'cursor-pointer' : ''
                   } ${rowClassName ? rowClassName(row, ri) : ''}`}
                 >
@@ -182,7 +184,7 @@ export default function UnifiedTable<T = any>({
                     return (
                       <td
                         key={col.key}
-                        className="px-4 py-2.5 text-[hsl(var(--muted-foreground))] whitespace-nowrap truncate max-w-[300px]"
+                        className="px-4 py-3 text-sm text-[hsl(var(--foreground))] whitespace-nowrap truncate max-w-[300px]"
                         style={{ textAlign: col.align || 'left' }}
                         title={String(raw ?? '')}
                       >
@@ -199,51 +201,38 @@ export default function UnifiedTable<T = any>({
 
       {/* Pagination */}
       {pagination && filtered.length > 0 && (
-        <div className="px-4 py-3 border-t border-[hsl(var(--border))] flex items-center justify-between flex-wrap gap-3">
-          <div className="text-[11px] text-[hsl(var(--muted-foreground))]">
-            共 <strong className="text-[hsl(var(--foreground))]">{filtered.length}</strong> 条，第 <strong className="text-[hsl(var(--foreground))]">{safePage}</strong> / <strong className="text-[hsl(var(--foreground))]">{totalPages}</strong> 页
+        <div className="flex items-center justify-between p-4 border-t border-[hsl(var(--border))]">
+          <div className="text-sm text-[hsl(var(--muted-foreground))]">
+            显示 <strong className="text-[hsl(var(--foreground))]">{(safePage - 1) * size + 1}-{Math.min(safePage * size, filtered.length)}</strong> 条，共 <strong className="text-[hsl(var(--foreground))]">{filtered.length}</strong> 条
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-[11px] text-[hsl(var(--muted-foreground))]">
-              每页
-              <select
-                value={size}
-                onChange={e => { setSize(Number(e.target.value)); setPage(1) }}
-                className="px-1.5 py-0.5 rounded-md border border-[hsl(var(--border))] text-[11px] outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]"
-              >
-                {pageSizeOptions.map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-              条
-            </div>
-            <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-1">
+            <button
+              disabled={safePage <= 1}
+              onClick={() => setPage(safePage - 1)}
+              className="p-1.5 rounded-lg text-sm font-medium text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-all duration-150"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            {pages.map(p => (
               <button
-                disabled={safePage <= 1}
-                onClick={() => setPage(safePage - 1)}
-                className="p-1.5 rounded-md hover:bg-[hsl(var(--muted))] disabled:opacity-30 transition-colors"
+                key={p}
+                onClick={() => setPage(p)}
+                className={`min-w-[32px] px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  p === safePage
+                    ? 'bg-[hsl(var(--primary))] text-white hover:opacity-90'
+                    : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'
+                }`}
               >
-                <ChevronLeft className="w-4 h-4" />
+                {p}
               </button>
-              {pages.map(p => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={`min-w-[28px] px-1.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                    p === safePage
-                      ? 'bg-[hsl(var(--primary))] text-white'
-                      : 'hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-              <button
-                disabled={safePage >= totalPages}
-                onClick={() => setPage(safePage + 1)}
-                className="p-1.5 rounded-md hover:bg-[hsl(var(--muted))] disabled:opacity-30 transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+            ))}
+            <button
+              disabled={safePage >= totalPages}
+              onClick={() => setPage(safePage + 1)}
+              className="p-1.5 rounded-lg text-sm font-medium text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-all duration-150"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}
