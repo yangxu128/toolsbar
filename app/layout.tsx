@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Box, Sun, Moon, Settings, Search, Command, Home } from 'lucide-react'
+import { Box, Sun, Moon, Settings, Search, Home } from 'lucide-react'
 import { useThemeStore } from '@/lib/theme-store'
+import { useSearchStore } from '@/lib/search-store'
 import ToastContainer from '@/components/toast-container'
 import SettingsDrawer from '@/components/settings-drawer'
 import './globals.css'
@@ -14,8 +15,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const toggleTheme = useThemeStore((s) => s.toggleTheme)
   const pathname = usePathname()
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const searchQuery = useSearchStore((s) => s.query)
+  const setSearchQuery = useSearchStore((s) => s.setQuery)
+  const desktopInputRef = useRef<HTMLInputElement>(null)
+  const mobileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -28,11 +31,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault()
-      setSearchOpen(true)
+      if (desktopInputRef.current) {
+        desktopInputRef.current.focus()
+      } else if (mobileInputRef.current) {
+        mobileInputRef.current.focus()
+      }
     }
     if (e.key === 'Escape') {
-      setSearchOpen(false)
       setSettingsOpen(false)
+      setSearchQuery('')
+      document.activeElement instanceof HTMLElement && document.activeElement.blur()
     }
   }, [])
 
@@ -47,50 +55,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ToastContainer />
         <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
-        {searchOpen && (
-          <div className="fixed inset-0 z-[80] flex items-start justify-center pt-[20vh]">
-            <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setSearchOpen(false)} />
-            <div className="relative w-full max-w-lg mx-4 bg-[hsl(var(--card))] rounded-xl border border-[hsl(var(--border))] shadow-2xl overflow-hidden">
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-[hsl(var(--border))]">
-                <Search className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-                <input
-                  autoFocus
-                  placeholder="搜索工具..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 outline-none text-sm bg-transparent text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]"
-                />
-                <kbd>Esc</kbd>
-              </div>
-              <div className="p-2">
-                <Link href="/kpi" onClick={() => setSearchOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[hsl(var(--muted))] transition-colors">
-                  <div className="w-8 h-8 rounded-md bg-emerald-500 flex items-center justify-center text-white">
-                    <Command className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Excel指标计算</div>
-                    <div className="text-[11px] text-[hsl(var(--muted-foreground))]">Excel 指标文件解析与公式计算</div>
-                  </div>
-                </Link>
-                <Link href="/xml" onClick={() => setSearchOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[hsl(var(--muted))] transition-colors">
-                  <div className="w-8 h-8 rounded-md bg-blue-500 flex items-center justify-center text-white">
-                    <Command className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">XML 在线阅读器</div>
-                    <div className="text-[11px] text-[hsl(var(--muted-foreground))]">XML 文件解析、筛选与导出</div>
-                  </div>
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-
         <header className="glass-header sticky top-0 z-50 h-16 flex items-center">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+            <Link href="/" onClick={() => setSearchQuery('')} className="flex items-center gap-2.5 shrink-0 group">
               <div className="w-8 h-8 rounded-lg bg-[hsl(var(--primary))] flex items-center justify-center text-white shadow-md group-hover:shadow-[hsl(var(--primary))]/30 transition-shadow">
                 <Box className="w-5 h-5" />
               </div>
@@ -100,10 +67,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="hidden md:flex flex-1 max-w-md relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
               <input
+                ref={desktopInputRef}
                 type="text"
                 placeholder="搜索工具（如：Excel、XML、JSON）..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="search-input"
-                onFocus={() => setSearchOpen(true)}
               />
               <kbd className="hidden lg:inline-flex absolute right-3 top-1/2 -translate-y-1/2 items-center gap-1">
                 <span>⌘</span><span>K</span>
@@ -129,10 +98,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
             <input
+              ref={mobileInputRef}
               type="text"
               placeholder="搜索工具..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="search-input w-full"
-              onFocus={() => setSearchOpen(true)}
             />
           </div>
         </div>

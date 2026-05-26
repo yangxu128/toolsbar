@@ -8,6 +8,7 @@ import {
   Clock, Search, X, LayoutGrid, Code2, Palette, Radio
 } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
+import { useSearchStore } from '@/lib/search-store'
 
 const categories = [
   { key: 'all', label: '全部', icon: LayoutGrid },
@@ -159,11 +160,12 @@ function useCountUp(target: number, duration = 1500) {
 
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState('all')
-  const [searchQuery, setSearchQuery] = useState('')
   const [animatingFav, setAnimatingFav] = useState<string | null>(null)
   const favorites = useFavStore((s) => s.favorites)
   const toggleFav = useFavStore((s) => s.toggleFav)
   const isFav = useFavStore((s) => s.isFav)
+  const searchQuery = useSearchStore((s) => s.query)
+  const setSearchGlobal = useSearchStore((s) => s.setQuery)
 
   const availableTools = tools.filter((t) => t.available)
   const categorySet = new Set(availableTools.map((t) => t.category))
@@ -286,7 +288,7 @@ export default function Home() {
           <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] mb-1">未找到相关工具</h3>
           <p className="text-[hsl(var(--muted-foreground))] text-sm">尝试更换关键词或清除筛选条件</p>
           <button
-            onClick={() => { setSearchQuery(''); setActiveCategory('all') }}
+            onClick={() => { setSearchGlobal(''); setActiveCategory('all') }}
             className="mt-4 px-4 py-2 bg-[hsl(var(--primary))] text-white rounded-lg font-medium text-sm hover:opacity-90 active:scale-[0.97] transition-all"
           >
             清除筛选
