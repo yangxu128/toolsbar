@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   Calculator, FileCode, BarChart3, Database, Settings2,
   ArrowRight, Wrench, FolderOpen, Star, ShieldCheck,
-  Clock, Search, X, LayoutGrid, Code2, Palette
+  Clock, Search, X, LayoutGrid, Code2, Palette, Radio
 } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
@@ -41,6 +41,19 @@ const tools = [
     colorLight: 'bg-blue-50 text-blue-600',
     path: '/xml',
     tags: ['XML', '解析'],
+    category: 'dev',
+    categoryLabel: '开发工具',
+    available: true,
+  },
+  {
+    id: 'rf-calculator',
+    name: '4G/5G无线参数计算',
+    desc: 'LTE EARFCN、5G NR-ARFCN、4G ECI、5G NCI 全功能查询与换算',
+    icon: Radio,
+    color: 'bg-sky-500',
+    colorLight: 'bg-sky-50 text-sky-600',
+    path: '/rf-calculator',
+    tags: ['4G', '5G', 'RF'],
     category: 'dev',
     categoryLabel: '开发工具',
     available: true,
