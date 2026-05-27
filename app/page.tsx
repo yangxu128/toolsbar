@@ -5,7 +5,8 @@ import Link from 'next/link'
 import {
   Calculator, FileCode, BarChart3, Database, Settings2,
   ArrowRight, Wrench, FolderOpen, Star, ShieldCheck,
-  Clock, Search, X, LayoutGrid, Code2, Palette, Radio
+  Clock, Search, X, LayoutGrid, Code2, Palette, Radio,
+  GitMerge
 } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 import { useSearchStore } from '@/lib/search-store'
@@ -57,6 +58,19 @@ const tools = [
     tags: ['4G', '5G', 'RF'],
     category: 'dev',
     categoryLabel: '开发工具',
+    available: true,
+  },
+  {
+    id: 'csv-merge',
+    name: 'CSV批量合并',
+    desc: '按文件名前20位自动分组，批量合并CSV文件，支持GBK/UTF-8编码自动检测',
+    icon: GitMerge,
+    color: 'bg-teal-500',
+    colorLight: 'bg-teal-50 text-teal-600',
+    path: '/csv-merge',
+    tags: ['CSV', '合并'],
+    category: 'data',
+    categoryLabel: '数据处理',
     available: true,
   },
   {
