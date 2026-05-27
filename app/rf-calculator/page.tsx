@@ -20,7 +20,6 @@ const tabs = [
 
 const inp = "px-3 py-2.5 rounded-lg border border-[hsl(var(--border))] text-sm outline-none focus:border-sky-500/50 bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]"
 const btn = "w-full py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium text-sm hover:opacity-90 active:scale-[0.97] transition-all cursor-pointer border-0"
-const btnV = "w-full py-2.5 text-white rounded-lg font-medium text-sm hover:opacity-90 active:scale-[0.97] transition-all cursor-pointer border-0"
 
 export default function RfCalculatorPage() {
   const [activeTab, setActiveTab] = useState('lte')
@@ -85,9 +84,9 @@ export default function RfCalculatorPage() {
   )
 }
 
-function ResultBox({ children, empty = false, style }: { children: React.ReactNode; empty?: boolean; style?: React.CSSProperties }) {
+function ResultBox({ children, empty }: { children: React.ReactNode; empty?: boolean }) {
   return (
-    <div className={`mt-4 p-4 rounded-xl ${empty ? 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] italic' : 'bg-sky-500/5 border border-sky-500/10'}`} style={style}>
+    <div className={`mt-4 p-4 rounded-xl ${empty ? 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] italic' : 'bg-sky-500/5 border border-sky-500/10'}`}>
       {children}
     </div>
   )
@@ -102,12 +101,11 @@ function ResultRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-function Badge({ children, color = 'sky' }: { children: React.ReactNode; color?: 'sky' | 'emerald' | 'amber' | 'violet' | 'slate' }) {
+function Badge({ children, color = 'sky' }: { children: React.ReactNode; color?: 'sky' | 'emerald' | 'amber' | 'slate' }) {
   const map: Record<string, string> = {
     sky: 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400',
     emerald: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
     amber: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
-    violet: 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400',
     slate: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',
   }
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wide ${map[color]}`}>{children}</span>
@@ -232,28 +230,28 @@ function NrTab() {
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-xl border border-[hsl(var(--border)] bg-[hsl(var(--muted))] p-6">
-          <h3 className="text-base font-semibold text-violet-600 mb-4 flex items-center gap-2"><Radio className="w-4 h-4" />NR-ARFCN → 频率</h3>
+          <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><Radio className="w-4 h-4" />NR-ARFCN → 频率</h3>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入 NR-ARFCN (0 – 3279165)</label>
             <input type="number" min={0} max={3279165} value={nrArfcn} onChange={e => setNrArfcn(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleNrFreq()}
               className={`${inp} w-full`} placeholder="例如：620000" />
           </div>
-          <button onClick={handleNrFreq} className={btnV} style={{ background: '#7c3aed' }}>计算频率</button>
+          <button onClick={handleNrFreq} className={btn}>计算频率</button>
           {nrFreqResult ? (
             nrFreqResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{nrFreqResult.error}</span>} /></ResultBox> : (
-              <ResultBox style={{ background: 'rgba(139,92,246,0.05)', borderColor: 'rgba(139,92,246,0.15)' }}>
-                <ResultRow label="NR-ARFCN" value={<span className="text-lg text-violet-600">{nrFreqResult.nref}</span>} />
+              <ResultBox>
+                <ResultRow label="NR-ARFCN" value={<span className="text-lg text-sky-600">{nrFreqResult.nref}</span>} />
                 <ResultRow label="中心频率" value={`${nrFreqResult.freq.toFixed(3)} MHz`} />
                 <ResultRow label="频率范围" value={nrFreqResult.range.range} />
                 <ResultRow label="全局栅格" value={`${nrFreqResult.range.deltaF} kHz`} />
-                <ResultRow label="匹配频段" value={nrFreqResult.matchedBand ? <><Badge color="violet">{nrFreqResult.matchedBand.band}</Badge> <Badge color={nrFreqResult.matchedBand.mode === 'FDD' ? 'sky' : 'emerald'}>{nrFreqResult.matchedBand.mode}</Badge></> : '未匹配到已知频段'} />
+                <ResultRow label="匹配频段" value={nrFreqResult.matchedBand ? <><Badge color="sky">{nrFreqResult.matchedBand.band}</Badge> <Badge color={nrFreqResult.matchedBand.mode === 'FDD' ? 'sky' : 'emerald'}>{nrFreqResult.matchedBand.mode}</Badge></> : '未匹配到已知频段'} />
               </ResultBox>
             )
           ) : <ResultBox empty><span className="text-sm">输入 NR-ARFCN 后点击计算</span></ResultBox>}
         </div>
 
         <div className="rounded-xl border border-[hsl(var(--border)] bg-[hsl(var(--muted))] p-6">
-          <h3 className="text-base font-semibold text-violet-600 mb-4 flex items-center gap-2"><Radio className="w-4 h-4" />频率 → NR-ARFCN</h3>
+          <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><Radio className="w-4 h-4" />频率 → NR-ARFCN</h3>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">选择 NR 频段</label>
             <select value={nrBandSel} onChange={e => setNrBandSel(e.target.value)} className={`${inp} w-full`}>
@@ -266,13 +264,13 @@ function NrTab() {
             <input type="number" step={0.001} value={nrFreqInput} onChange={e => setNrFreqInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleNrArfcn()}
               className={`${inp} w-full`} placeholder="例如：3410.400" />
           </div>
-          <button onClick={handleNrArfcn} className={btnV} style={{ background: '#7c3aed' }}>计算 NR-ARFCN</button>
+          <button onClick={handleNrArfcn} className={btn}>计算 NR-ARFCN</button>
           {nrArfcnResult ? (
             nrArfcnResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{nrArfcnResult.error}</span>} /></ResultBox> : (
-              <ResultBox style={{ background: 'rgba(139,92,246,0.05)', borderColor: 'rgba(139,92,246,0.15)' }}>
-                <ResultRow label="频段" value={<><Badge color="violet">{nrArfcnResult.band.band}</Badge> <Badge color={nrArfcnResult.band.mode === 'FDD' ? 'sky' : 'emerald'}>{nrArfcnResult.band.mode}</Badge></>} />
+              <ResultBox>
+                <ResultRow label="频段" value={<><Badge color="sky">{nrArfcnResult.band.band}</Badge> <Badge color={nrArfcnResult.band.mode === 'FDD' ? 'sky' : 'emerald'}>{nrArfcnResult.band.mode}</Badge></>} />
                 <ResultRow label="中心频率" value={`${nrArfcnResult.freq.toFixed(3)} MHz`} />
-                <ResultRow label="NR-ARFCN" value={<span className="text-lg text-violet-600">{nrArfcnResult.arfcn}</span>} />
+                <ResultRow label="NR-ARFCN" value={<span className="text-lg text-sky-600">{nrArfcnResult.arfcn}</span>} />
                 <ResultRow label="全局栅格" value={`${nrArfcnResult.band.deltaF} kHz`} />
               </ResultBox>
             )
@@ -426,7 +424,7 @@ function NciTab() {
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-xl border border-[hsl(var(--border)] bg-[hsl(var(--muted))] p-6">
-          <h3 className="text-base font-semibold text-violet-600 mb-4 flex items-center gap-2"><TowerControl className="w-4 h-4" />NCI → gNB ID + Cell ID</h3>
+          <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><TowerControl className="w-4 h-4" />NCI → gNB ID + Cell ID</h3>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入 NCI (十进制或十六进制)</label>
             <div className="flex gap-2">
@@ -448,17 +446,17 @@ function NciTab() {
               <option value={32}>32 bits (Cell ID 4 bits)</option>
             </select>
           </div>
-          <button onClick={handleDecode} className={btnV} style={{ background: '#7c3aed' }}>解析 NCI</button>
+          <button onClick={handleDecode} className={btn}>解析 NCI</button>
           {decodeResult ? (
             decodeResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{decodeResult.error}</span>} /></ResultBox> : (
-              <ResultBox style={{ background: 'rgba(139,92,246,0.05)', borderColor: 'rgba(139,92,246,0.15)' }}>
+              <ResultBox>
                 <ResultRow label="NCI (十进制)" value={decodeResult.nci} />
                 <ResultRow label="NCI (十六进制)" value={`0x${decodeResult.nci.toString(16).toUpperCase().padStart(9, '0')}`} />
                 <ResultRow label="gNB ID 位长" value={`${decodeResult.gnbIdLen} bits`} />
                 <ResultRow label="Cell ID 位长" value={`${decodeResult.cellIdLen} bits`} />
-                <ResultRow label="gNB ID" value={<span className="text-violet-600">{decodeResult.gnbId}</span>} />
+                <ResultRow label="gNB ID" value={<span className="text-sky-600">{decodeResult.gnbId}</span>} />
                 <ResultRow label="gNB ID (Hex)" value={`0x${decodeResult.gnbId.toString(16).toUpperCase()}`} />
-                <ResultRow label="Cell ID" value={<span className="text-violet-600">{decodeResult.cellId}</span>} />
+                <ResultRow label="Cell ID" value={<span className="text-sky-600">{decodeResult.cellId}</span>} />
                 <ResultRow label="Cell ID (Hex)" value={`0x${decodeResult.cellId.toString(16).toUpperCase()}`} />
                 <ResultRow label="最大 gNB ID" value={decodeResult.maxGnb} />
                 <ResultRow label="最大 Cell ID" value={decodeResult.maxCell} />
@@ -468,7 +466,7 @@ function NciTab() {
         </div>
 
         <div className="rounded-xl border border-[hsl(var(--border)] bg-[hsl(var(--muted))] p-6">
-          <h3 className="text-base font-semibold text-violet-600 mb-4 flex items-center gap-2"><TowerControl className="w-4 h-4" />gNB ID + Cell ID → NCI</h3>
+          <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><TowerControl className="w-4 h-4" />gNB ID + Cell ID → NCI</h3>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">gNB ID</label>
             <input type="number" min={0} value={gnbId} onChange={e => setGnbId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleEncode()}
@@ -489,11 +487,11 @@ function NciTab() {
               <option value={32}>32 bits</option>
             </select>
           </div>
-          <button onClick={handleEncode} className={btnV} style={{ background: '#7c3aed' }}>合成 NCI</button>
+          <button onClick={handleEncode} className={btn}>合成 NCI</button>
           {encodeResult ? (
             encodeResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{encodeResult.error}</span>} /></ResultBox> : (
-              <ResultBox style={{ background: 'rgba(139,92,246,0.05)', borderColor: 'rgba(139,92,246,0.15)' }}>
-                <ResultRow label="NCI (十进制)" value={<span className="text-lg text-violet-600">{encodeResult.nci}</span>} />
+              <ResultBox>
+                <ResultRow label="NCI (十进制)" value={<span className="text-lg text-sky-600">{encodeResult.nci}</span>} />
                 <ResultRow label="NCI (十六进制)" value={`0x${encodeResult.nci.toString(16).toUpperCase().padStart(9, '0')}`} />
                 <ResultRow label="gNB ID" value={`${encodeResult.gnbId} (0x${encodeResult.gnbId.toString(16).toUpperCase()}) [${encodeResult.gnbIdLen} bits]`} />
                 <ResultRow label="Cell ID" value={`${encodeResult.cellId} (0x${encodeResult.cellId.toString(16).toUpperCase()}) [${36 - encodeResult.gnbIdLen} bits]`} />
@@ -556,7 +554,7 @@ function RefTab() {
         <UnifiedTable columns={lteColumns} data={lteRefData} pagination pageSize={10} showTotal />
       </div>
       <div>
-        <h3 className="text-base font-semibold text-[hsl(var(--foreground))] mb-3 flex items-center gap-2"><Radio className="w-4 h-4 text-violet-600" />5G NR 频段 NR-ARFCN 参考表</h3>
+        <h3 className="text-base font-semibold text-[hsl(var(--foreground))] mb-3 flex items-center gap-2"><Radio className="w-4 h-4 text-sky-600" />5G NR 频段 NR-ARFCN 参考表</h3>
         <UnifiedTable columns={nrColumns} data={nrRefData} pagination pageSize={10} showTotal />
       </div>
     </div>
