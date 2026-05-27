@@ -63,7 +63,7 @@ export default function CalcGrid() {
           key = subnetCol >= 0 ? String(row[subnetCol] ?? '').trim() : ''
         } else if (mode === 'city') {
           const raw = subnetCol >= 0 ? String(row[subnetCol] ?? '').trim() : ''
-          key = raw.slice(0, 2)
+          key = raw.replace(/\s/g, '').slice(0, 2)
         }
         if (!key) key = '未知'
         if (!groups.has(key)) groups.set(key, { key, rows: [] })
