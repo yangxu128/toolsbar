@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Play, Loader2, BarChart3 } from 'lucide-react'
+import { Play, Loader2, BarChart3, Download } from 'lucide-react'
 import { useKpiStore } from '@/lib/store'
 import { calcAll, evaluateFormulaWithValues } from '@/lib/calc'
 import UnifiedTable from './unified-table'
@@ -139,6 +139,56 @@ export default function CalcGrid() {
     return cols
   }, [dimResult, mode])
 
+  const singleTableData = useMemo(() => {
+    return results.map(r => ({
+      id: r.id,
+      desc: r.desc,
+      formula: r.formula,
+      result: r.result,
+      error: r.error,
+      steps: r.steps,
+      expr: r.expr,
+    }))
+  }, [results])
+
+  const singleColumns = [
+    { key: 'id', title: '指标ID', width: 100 },
+    { key: 'desc', title: '描述', width: 160 },
+    { key: 'formula', title: '公式', width: 200 },
+    { key: 'result', title: '结果', width: 100, align: 'right' as const, render: (v: any, row: any) => <span className={row.error ? 'text-red-500' : 'text-emerald-500 font-semibold'}>{row.error ? '错误' : fmt(v)}</span> },
+  ]
+
+  const handleExport = () => {
+    const exportData = mode === 'none' ? singleTableData : dimResult.data
+    if (!exportData.length) return
+
+    let csvContent = ''
+    if (mode === 'none') {
+      csvContent = '指标ID,描述,公式,结果\n'
+      exportData.forEach((row: any) => {
+        csvContent += `${row.id},${row.desc},${row.formula},${row.error ? '错误' : fmt(row.result)}\n`
+      })
+    } else {
+      const cols = dimColumns
+      csvContent = cols.map(c => c.title).join(',') + '\n'
+      exportData.forEach((row: any) => {
+        csvContent += cols.map((c: any) => {
+          const v = row[c.key]
+          if (v === null || v === undefined) return ''
+          const s = String(v).replace(/"/g, '""')
+          return /[",\n]/.test(s) ? `"${s}"` : s
+        }).join(',') + '\n'
+      })
+    }
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `指标计算_${mode === 'none' ? '单行' : mode === 'time' ? '时间汇总' : mode === 'subnet' ? '子网汇总' : '地市汇总'}_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   return (
     <div className="space-y-3">
       <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] p-4 flex items-end gap-3 flex-wrap">
@@ -181,32 +231,51 @@ export default function CalcGrid() {
       </div>
 
       {mode === 'none' && results.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {results.map((r, i) => (
-            <div key={i} className="card-dark rounded-lg p-4">
-              <div className="flex items-start justify-between mb-2">
-                <span className="font-mono text-xs font-medium text-[hsl(var(--primary))]">{r.id}</span>
-                {!r.error && r.result !== null && (
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-[hsl(var(--secondary))] text-muted">{r.desc.slice(0, 12)}</span>
+        <>
+          <div className="flex justify-end">
+            <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors">
+              <Download className="w-4 h-4" /> 导出CSV
+            </button>
+          </div>
+          <UnifiedTable
+            columns={singleColumns}
+            data={singleTableData}
+            searchable
+            searchKeys={['id', 'desc']}
+            showTotal
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+            {results.map((r, i) => (
+              <div key={i} className="bg-[hsl(var(--card))] rounded-xl border border-[hsl(var(--border))] p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <span className="font-mono text-xs font-medium text-[hsl(var(--primary))]">{r.id}</span>
+                  {!r.error && r.result !== null && (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]">{r.desc.slice(0, 12)}</span>
+                  )}
+                </div>
+                <div className={`text-xl font-semibold mb-1 ${r.error ? 'text-red-500' : 'text-emerald-500'}`}>
+                  {r.error ? `错误` : fmt(r.result)}
+                </div>
+                <div className="text-[11px] text-[hsl(var(--muted-foreground))] mb-2">公式: {r.formula}</div>
+                {r.steps?.length > 0 && (
+                  <div className="bg-[hsl(var(--muted))] rounded-md p-2 space-y-0.5 mt-2">
+                    {r.steps.map((s: string, j: number) => <div key={j} className="text-[10px] font-mono text-emerald-500">{s}</div>)}
+                    <div className="text-[10px] font-mono text-[hsl(var(--muted-foreground))] pt-1 border-t border-[hsl(var(--border))]">→ {r.expr} = {fmt(r.result)}</div>
+                  </div>
                 )}
               </div>
-              <div className={`text-xl font-semibold mb-1 ${r.error ? 'text-red-500' : 'text-emerald-500'}`}>
-                {r.error ? `错误` : fmt(r.result)}
-              </div>
-              <div className="text-[11px] text-muted mb-2">公式: {r.formula}</div>
-              {r.steps?.length > 0 && (
-                <div className="bg-[hsl(var(--muted))] rounded-md p-2 space-y-0.5 mt-2">
-                  {r.steps.map((s: string, j: number) => <div key={j} className="text-[10px] font-mono text-emerald-500">{s}</div>)}
-                  <div className="text-[10px] font-mono text-muted pt-1 border-t border-[hsl(var(--border))]">→ {r.expr} = {fmt(r.result)}</div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
 
       {mode !== 'none' && dimResult.data.length > 0 && (
         <>
+          <div className="flex justify-end">
+            <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors">
+              <Download className="w-4 h-4" /> 导出CSV
+            </button>
+          </div>
           <UnifiedTable
             columns={dimColumns}
             data={dimResult.data}
@@ -214,26 +283,29 @@ export default function CalcGrid() {
             searchKeys={['key']}
             showTotal
           />
-          {dimResult.metricIds.map((id: string) => (
-            <div key={id} className="bg-[hsl(var(--muted))] rounded-xl p-4 mt-4">
-              <h4 className="text-sm font-semibold text-[hsl(var(--foreground))] mb-2">{id} 计算过程</h4>
-              <div className="space-y-2">
-                {dimResult.data.map((g: any, idx: number) => (
-                  g.steps?.[id] && (
-                    <div key={idx} className="text-xs">
-                      <span className="font-medium text-[hsl(var(--primary))]">{g.key}</span>
-                      <span className="text-[hsl(var(--muted-foreground))] mx-1">({g.count}行)</span>
-                      <div className="mt-1 space-y-0.5">
-                        {g.steps[id].map((s: string, j: number) => (
-                          <div key={j} className="text-[10px] font-mono text-emerald-500">{s}</div>
-                        ))}
-                      </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+            {dimResult.metricIds.map((id: string) => (
+              dimResult.data.map((g: any, idx: number) => (
+                g.steps?.[id] && (
+                  <div key={`${id}-${idx}`} className="bg-[hsl(var(--card))] rounded-xl border border-[hsl(var(--border))] p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="font-mono text-xs font-medium text-[hsl(var(--primary))]">{id}</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]">{g.key}</span>
                     </div>
-                  )
-                ))}
-              </div>
-            </div>
-          ))}
+                    <div className="text-xl font-semibold mb-1 text-emerald-500">
+                      {fmt(g[`sum_${id}`])}
+                    </div>
+                    <div className="text-[11px] text-[hsl(var(--muted-foreground))] mb-2">{g.count}行数据汇总</div>
+                    <div className="bg-[hsl(var(--muted))] rounded-md p-2 space-y-0.5 mt-2">
+                      {g.steps[id].map((s: string, j: number) => (
+                        <div key={j} className="text-[10px] font-mono text-emerald-500">{s}</div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              ))
+            ))}
+          </div>
         </>
       )}
 
