@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Play, Loader2, BarChart3 } from 'lucide-react'
 import { useKpiStore } from '@/lib/store'
-import { calcAll } from '@/lib/calc'
+import { calcAll, evaluateFormulaWithValues } from '@/lib/calc'
 import UnifiedTable from './unified-table'
 
 function fmt(n: any) {
@@ -70,35 +70,46 @@ export default function CalcGrid() {
         groups.get(key)!.rows.push(i)
       }
 
+      const { metrics } = useKpiStore.getState()
+      const allCounterIds = new Set<string>()
+      for (const m of metrics) {
+        if (!m.formula) continue
+        const ids = m.formula.match(/C?\d+/g) || []
+        ids.forEach(id => allCounterIds.add(id))
+      }
+
       const allMetrics = new Set<string>()
       const groupResults: any[] = []
 
       for (const [key, g] of groups) {
-        const metricSums: Record<string, number> = {}
-        const metricCounts: Record<string, number> = {}
-        const metricSteps: Record<string, string[]> = {}
+        const counterSums: Record<string, number> = {}
         for (const ri of g.rows) {
-          const calcRes = calcAll(ri)
-          for (const r of calcRes) {
-            if (r.result === null || r.error) continue
-            allMetrics.add(r.id)
-            metricSums[r.id] = (metricSums[r.id] || 0) + r.result
-            metricCounts[r.id] = (metricCounts[r.id] || 0) + 1
-            if (r.steps && !metricSteps[r.id]) metricSteps[r.id] = r.steps
+          const row = rows[ri]
+          for (const id of allCounterIds) {
+            const colIdx = headers.findIndex((h: string) => h.startsWith(id + ':') || h === id)
+            const v = colIdx >= 0 ? parseFloat(String(row[colIdx] ?? '').replace(/,/g, '')) || 0 : 0
+            counterSums[id] = (counterSums[id] || 0) + v
           }
         }
-        const avg: Record<string, number> = {}
-        for (const id of allMetrics) {
-          avg[id] = metricCounts[id] ? metricSums[id] / metricCounts[id] : 0
+
+        const metricSums: Record<string, number> = {}
+        const metricSteps: Record<string, string[]> = {}
+        for (const m of metrics) {
+          if (!m.formula) continue
+          const r = evaluateFormulaWithValues(m.formula, counterSums)
+          if (!r || r.result === null || r.error) continue
+          allMetrics.add(m.id)
+          metricSums[m.id] = r.result
+          if (r.steps) metricSteps[m.id] = r.steps
         }
-        groupResults.push({ key, count: g.rows.length, sums: metricSums, avgs: avg, steps: metricSteps })
+
+        groupResults.push({ key, count: g.rows.length, sums: metricSums, steps: metricSteps })
       }
 
       const metricIds = Array.from(allMetrics)
       const data = groupResults.map(g => {
         const obj: Record<string, any> = { key: g.key, count: g.count, steps: g.steps }
         metricIds.forEach(id => {
-          obj[`avg_${id}`] = g.avgs[id] ?? null
           obj[`sum_${id}`] = g.sums[id] ?? null
         })
         return obj
@@ -118,15 +129,8 @@ export default function CalcGrid() {
     ]
     dimResult.metricIds.forEach((id: string) => {
       cols.push({
-        key: `avg_${id}`,
-        title: `${id} (平均)`,
-        width: 140,
-        align: 'right' as const,
-        render: (v: any) => <span className="tabular-nums text-xs">{fmt(v)}</span>,
-      })
-      cols.push({
         key: `sum_${id}`,
-        title: `${id} (合计)`,
+        title: id,
         width: 140,
         align: 'right' as const,
         render: (v: any) => <span className="tabular-nums text-xs">{fmt(v)}</span>,

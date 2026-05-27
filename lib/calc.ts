@@ -59,6 +59,32 @@ export function evaluateFormula(formula: string, rowIdx: number): EvalResult | n
   }
 }
 
+export function evaluateFormulaWithValues(formula: string, values: Record<string, number | null>): EvalResult | null {
+  if (!formula) return null
+
+  const idPattern = /C?\d+/g
+  const ids = [...new Set(formula.match(idPattern) || [])]
+
+  let jsExpr = formula
+  for (const id of ids) {
+    const v = values[id]
+    if (v === null || v === undefined) return { result: null, error: `缺少数据: ${id}`, steps: [] }
+    jsExpr = jsExpr.replace(new RegExp('\\b' + id + '\\b', 'g'), String(v))
+  }
+
+  try {
+    const result = Function('"use strict"; return (' + jsExpr + ')')()
+    const steps = ids.map(id => `${id}=${values[id]}`)
+    return {
+      result: result === Infinity || result === -Infinity || isNaN(result) ? null : result,
+      steps,
+      expr: jsExpr,
+    }
+  } catch (e: any) {
+    return { result: null, error: e.message, steps: [] }
+  }
+}
+
 export function calcAll(rowIdx: number): CalcResult[] {
   const { metrics } = useKpiStore.getState()
   const results: CalcResult[] = []
