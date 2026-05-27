@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { UploadCloud, Download, FileSpreadsheet, X, Home, Star, ChevronRight as ChevronRightIcon, GitMerge, FolderOpen, CheckCircle2, AlertCircle } from 'lucide-react'
+import { UploadCloud, Save, FileSpreadsheet, X, Home, Star, ChevronRight as ChevronRightIcon, GitMerge, FolderOpen, CheckCircle2, AlertCircle, FolderInput } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 import UnifiedTable from '@/components/unified-table'
 
@@ -11,7 +11,15 @@ interface MergeGroup {
   files: string[]
   headers: string[]
   data: Record<string, string>[]
-  merged: boolean
+}
+
+type Encoding = 'auto' | 'gbk' | 'utf8' | 'utf8bom'
+
+const encLabels: Record<Encoding, string> = {
+  auto: '自动检测',
+  gbk: 'GBK',
+  utf8: 'UTF-8',
+  utf8bom: 'UTF-8 BOM',
 }
 
 export default function CsvMergePage() {
@@ -22,6 +30,9 @@ export default function CsvMergePage() {
   const [activeGroup, setActiveGroup] = useState<number>(0)
   const [logs, setLogs] = useState<string[]>([])
   const [processing, setProcessing] = useState(false)
+  const [encoding, setEncoding] = useState<Encoding>('gbk')
+  const [outputEncoding, setOutputEncoding] = useState<Encoding>('gbk')
+  const [saving, setSaving] = useState(false)
 
   const addLog = useCallback((msg: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`])
@@ -62,16 +73,17 @@ export default function CsvMergePage() {
     return { headers, rows }
   }, [])
 
-  const readFileWithEncoding = useCallback(async (file: File): Promise<string> => {
+  const readFileWithEncoding = useCallback(async (file: File, enc: Encoding): Promise<string> => {
+    const buffer = await file.arrayBuffer()
+    if (enc === 'gbk') return new TextDecoder('gbk').decode(buffer)
+    if (enc === 'utf8') return new TextDecoder('utf-8').decode(buffer)
+    if (enc === 'utf8bom') return new TextDecoder('utf-8').decode(buffer)
     try {
-      const buffer = await file.arrayBuffer()
-      try {
-        return new TextDecoder('gbk').decode(buffer)
-      } catch {
-        return new TextDecoder('utf-8').decode(buffer)
-      }
+      const decoded = new TextDecoder('gbk').decode(buffer)
+      if (/[\u4e00-\u9fa5]/.test(decoded)) return decoded
+      return new TextDecoder('utf-8').decode(buffer)
     } catch {
-      return await file.text()
+      return new TextDecoder('utf-8').decode(buffer)
     }
   }, [])
 
@@ -79,7 +91,7 @@ export default function CsvMergePage() {
     setProcessing(true)
     setLogs([])
     setGroups([])
-    addLog(`已选择 ${files.length} 个文件，开始解析...`)
+    addLog(`已选择 ${files.length} 个文件，编码：${encLabels[encoding]}，开始解析...`)
 
     const fileList = Array.from(files)
     const fileGroups = new Map<string, { file: File; name: string }[]>()
@@ -106,7 +118,7 @@ export default function CsvMergePage() {
 
       for (const { file, name } of fileItems) {
         try {
-          const text = await readFileWithEncoding(file)
+          const text = await readFileWithEncoding(file, encoding)
           const { headers, rows } = parseCsvText(text)
           if (headers.length === 0) { addLog(`文件 ${name} 无有效数据`); continue }
           if (mergedHeaders.length === 0) mergedHeaders = headers
@@ -122,7 +134,6 @@ export default function CsvMergePage() {
         files: fileItems.map(f => f.name),
         headers: mergedHeaders,
         data: mergedData,
-        merged: true,
       })
       addLog(`分组 [${prefix}...] 合并完成：共 ${mergedData.length} 行`)
     }
@@ -131,22 +142,79 @@ export default function CsvMergePage() {
     setActiveGroup(0)
     setProcessing(false)
     addLog('全部处理完成')
-  }, [addLog, readFileWithEncoding, parseCsvText])
+  }, [addLog, readFileWithEncoding, parseCsvText, encoding])
 
-  const handleDownload = useCallback((group: MergeGroup) => {
-    if (!group.headers.length || !group.data.length) return
+  const encodeOutput = useCallback((content: string, enc: Encoding): Uint8Array => {
+    if (enc === 'gbk') return gbkEncode(content)
+    if (enc === 'utf8bom') {
+      const bom = new Uint8Array([0xef, 0xbb, 0xbf])
+      const body = new TextEncoder().encode(content)
+      const merged = new Uint8Array(bom.length + body.length)
+      merged.set(bom, 0)
+      merged.set(body, bom.length)
+      return merged
+    }
+    return new TextEncoder().encode(content)
+  }, [])
+
+  const generateCsvContent = useCallback((group: MergeGroup): string => {
+    if (!group.headers.length || !group.data.length) return ''
     const escape = (v: string) => /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
-    const csvRows = [
+    return [
       group.headers.map(escape).join(','),
       ...group.data.map(row => group.headers.map(h => escape(row[h] || '')).join(','))
-    ]
-    const blob = new Blob(['\ufeff' + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `${group.prefix}合并.csv`
-    a.click()
-    URL.revokeObjectURL(a.href)
+    ].join('\r\n')
   }, [])
+
+  const handleSaveAll = useCallback(async () => {
+    if (groups.length === 0) return
+    setSaving(true)
+    try {
+      const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite', startIn: 'downloads' })
+      for (const group of groups) {
+        if (!group.data.length) continue
+        const content = generateCsvContent(group)
+        const data = encodeOutput(content, outputEncoding)
+        const fileName = `${group.prefix}合并.csv`
+        const fileHandle = await dirHandle.getFileHandle(fileName, { create: true })
+        const writable = await fileHandle.createWritable()
+        await writable.write(data)
+        await writable.close()
+        addLog(`已保存：${dirHandle.name}/${fileName} (${group.data.length}行, ${outputEncoding.toUpperCase()})`)
+      }
+      addLog('全部文件已保存到选定目录')
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        addLog('用户取消了目录选择')
+      } else {
+        addLog(`保存失败：${e.message}`)
+      }
+    }
+    setSaving(false)
+  }, [groups, outputEncoding, generateCsvContent, encodeOutput, addLog])
+
+  const handleSaveSingle = useCallback(async (group: MergeGroup) => {
+    if (!group.data.length) return
+    setSaving(true)
+    try {
+      const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite', startIn: 'downloads' })
+      const content = generateCsvContent(group)
+      const data = encodeOutput(content, outputEncoding)
+      const fileName = `${group.prefix}合并.csv`
+      const fileHandle = await dirHandle.getFileHandle(fileName, { create: true })
+      const writable = await fileHandle.createWritable()
+      await writable.write(data)
+      await writable.close()
+      addLog(`已保存：${dirHandle.name}/${fileName} (${group.data.length}行, ${outputEncoding.toUpperCase()})`)
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        addLog('用户取消了目录选择')
+      } else {
+        addLog(`保存失败：${e.message}`)
+      }
+    }
+    setSaving(false)
+  }, [outputEncoding, generateCsvContent, encodeOutput, addLog])
 
   const currentGroup = groups[activeGroup]
   const columns = currentGroup?.headers.map(h => ({ key: h, title: h, width: 150 })) || []
@@ -172,7 +240,7 @@ export default function CsvMergePage() {
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-[hsl(var(--foreground))]">CSV批量合并</h2>
-                <p className="text-[hsl(var(--muted-foreground))] mt-1">按文件名前20位自动分组，批量合并CSV文件，支持GBK/UTF-8编码</p>
+                <p className="text-[hsl(var(--muted-foreground))] mt-1">按文件名前20位自动分组，批量合并CSV文件</p>
               </div>
             </div>
             <button onClick={() => toggleFav('csv-merge')} className={`icon-btn shrink-0 ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}>
@@ -183,7 +251,7 @@ export default function CsvMergePage() {
 
         <div className="p-6 sm:p-8">
           {groups.length === 0 ? (
-            <UploadArea onUpload={handleUpload} processing={processing} />
+            <UploadArea onUpload={handleUpload} processing={processing} encoding={encoding} onEncodingChange={setEncoding} />
           ) : (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -196,18 +264,23 @@ export default function CsvMergePage() {
                         activeGroup === i
                           ? 'bg-teal-500 text-white'
                           : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--border))]'
-                      }`}
-                    >
+                      }`}>
                       <FolderOpen className="w-3 h-3 inline mr-1" />{g.prefix}... ({g.data.length}行)
                     </button>
                   ))}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => handleDownload(currentGroup)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors">
-                    <Download className="w-4 h-4" /> 导出当前组
+                  <select value={outputEncoding} onChange={e => setOutputEncoding(e.target.value as Encoding)}
+                    className="px-2 py-1.5 rounded-lg border border-[hsl(var(--border))] text-xs outline-none focus:border-teal-500 bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
+                    {(Object.keys(encLabels) as Encoding[]).map(k => <option key={k} value={k}>{encLabels[k]}</option>)}
+                  </select>
+                  <button onClick={() => handleSaveSingle(currentGroup)} disabled={saving}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+                    <Save className="w-4 h-4" /> 保存当前组
                   </button>
-                  <button onClick={() => { groups.forEach(g => handleDownload(g)) }} className="flex items-center gap-1.5 px-3 py-2 bg-teal-500 hover:bg-teal-600 text-white text-sm font-medium rounded-lg transition-colors">
-                    <Download className="w-4 h-4" /> 全部导出
+                  <button onClick={handleSaveAll} disabled={saving}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+                    <FolderInput className="w-4 h-4" /> 全部保存到目录
                   </button>
                 </div>
               </div>
@@ -256,7 +329,7 @@ export default function CsvMergePage() {
             <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] max-h-48 overflow-y-auto">
               {logs.map((log, i) => (
                 <div key={i} className="text-xs text-[hsl(var(--muted-foreground))] font-mono py-0.5 flex items-start gap-1.5">
-                  {log.includes('失败') ? <AlertCircle className="w-3 h-3 text-red-400 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />}
+                  {log.includes('失败') || log.includes('取消') ? <AlertCircle className="w-3 h-3 text-red-400 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />}
                   {log}
                 </div>
               ))}
@@ -268,11 +341,24 @@ export default function CsvMergePage() {
   )
 }
 
-function UploadArea({ onUpload, processing }: { onUpload: (files: FileList) => void; processing: boolean }) {
+function UploadArea({ onUpload, processing, encoding, onEncodingChange }: {
+  onUpload: (files: FileList) => void
+  processing: boolean
+  encoding: Encoding
+  onEncodingChange: (e: Encoding) => void
+}) {
   const [dragging, setDragging] = useState(false)
 
   return (
     <div className="max-w-2xl mx-auto">
+      <div className="mb-4 flex items-center gap-3">
+        <label className="text-xs font-medium text-[hsl(var(--muted-foreground))]">读取编码：</label>
+        <select value={encoding} onChange={e => onEncodingChange(e.target.value as Encoding)}
+          className="px-3 py-1.5 rounded-lg border border-[hsl(var(--border))] text-sm outline-none focus:border-teal-500 bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
+          {(Object.keys(encLabels) as Encoding[]).map(k => <option key={k} value={k}>{encLabels[k]}</option>)}
+        </select>
+      </div>
+
       <div onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length > 0) onUpload(e.dataTransfer.files) }}
@@ -301,11 +387,62 @@ function UploadArea({ onUpload, processing }: { onUpload: (files: FileList) => v
           </button>
         )}
       </div>
+
       <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))] space-y-1.5">
         <p className="flex items-center gap-2"><GitMerge className="w-4 h-4" /> 按文件名前20位字符自动分组</p>
-        <p className="flex items-center gap-2"><FileSpreadsheet className="w-4 h-4" /> 支持 GBK / UTF-8 编码自动检测</p>
-        <p className="flex items-center gap-2"><Download className="w-4 h-4" /> 可单独或批量导出合并后的 CSV 文件</p>
+        <p className="flex items-center gap-2"><FileSpreadsheet className="w-4 h-4" /> 支持手动指定或自动检测 GBK / UTF-8 编码</p>
+        <p className="flex items-center gap-2"><FolderInput className="w-4 h-4" /> 合并后通过系统目录选择器直接保存到本地</p>
       </div>
     </div>
   )
+}
+
+function gbkEncode(str: string): Uint8Array {
+  const bytes: number[] = []
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i)
+    if (code < 0x80) { bytes.push(code); continue }
+    if (code >= 0xd800 && code <= 0xdbff) { const hi = code; const lo = str.charCodeAt(++i); const cp = ((hi - 0xd800) << 10) + (lo - 0xdc00) + 0x10000; const enc = gbkLookup(cp); bytes.push(enc >> 8, enc & 0xff); continue }
+    const enc = gbkLookup(code)
+    bytes.push(enc >> 8, enc & 0xff)
+  }
+  return new Uint8Array(bytes)
+}
+
+function gbkLookup(cp: number): number {
+  if (cp >= 0x4e00 && cp <= 0x9fa5) { const idx = cp - 0x4e00; return 0xb0a1 + Math.floor(idx / 94) * 256 + (idx % 94) + 0xa1 }
+  if (cp >= 0x3000 && cp <= 0x303f) return gbkSym(cp) || 0x3f3f
+  if (cp >= 0xff00 && cp <= 0xff5e) return 0xa3 + ((cp - 0xff00) << 8) + 0xa1
+  if (cp === 0x2018 || cp === 0x2019) return 0xa1ae + (cp - 0x2018)
+  if (cp === 0x201c || cp === 0x201d) return 0xa3ac + (cp - 0x201c)
+  if (cp === 0x2014) return 0xc2a1
+  if (cp === 0x2026) return 0xa1ad
+  if (cp === 0x3001) return 0xa1a1
+  if (cp === 0x3002) return 0xa1a2
+  if (cp === 0x300a) return 0xa1a7
+  if (cp === 0x300c) return 0xa1a9
+  if (cp === 0x300d) return 0xa1aa
+  if (cp === 0x3010) return 0xa1ab
+  if (cp === 0x3011) return 0xa1ac
+  if (cp === 0xff01) return 0xa3a1
+  if (cp === 0xff0c) return 0xa3ac
+  if (cp === 0xff1b) return 0xa3ba
+  if (cp === 0xff1f) return 0xa3bb
+  if (cp === 0xff08) return 0xa3a8
+  if (cp === 0xff09) return 0xa3a9
+  return 0x3f3f
+}
+
+function gbkSym(cp: number): number | null {
+  const map: Record<number, number> = {
+    0x3000: 0xa1a1, 0x3001: 0xa1a2, 0x3002: 0xa1a3, 0x3003: 0xa1a4,
+    0x3005: 0xa1a5, 0x3006: 0xa1a6, 0x3007: 0xa1a7, 0x3008: 0xa1a8,
+    0x3009: 0xa1a9, 0x300a: 0xa1aa, 0x300b: 0xa1ab, 0x300c: 0xa1ac,
+    0x300d: 0xa1ad, 0x300e: 0xa1ae, 0x300f: 0xa1af, 0x3010: 0xa1b0,
+    0x3011: 0xa1b1, 0x3012: 0xa1b2, 0x3013: 0xa1b3, 0x3014: 0xa1b4,
+    0x3015: 0xa1b5, 0x3016: 0xa1b6, 0x3017: 0xa1b7, 0x3018: 0xa1b8,
+    0x3019: 0xa1b9, 0x301a: 0xa1ba, 0x301b: 0xa1bb, 0x301c: 0xa1bc,
+    0x301d: 0xa1bd, 0x301e: 0xa1be, 0x301f: 0xa1bf,
+  }
+  return map[cp] ?? null
 }
