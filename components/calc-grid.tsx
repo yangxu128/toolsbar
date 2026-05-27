@@ -146,24 +146,41 @@ export default function CalcGrid() {
     return cols
   }, [dimResult, mode, metricMap])
 
-  const singleTableData = useMemo(() => {
-    return results.map(r => ({
-      id: r.id,
-      desc: r.desc,
-      formula: r.formula,
-      result: r.result,
-      error: r.error,
-      steps: r.steps,
-      expr: r.expr,
-    }))
+  const singleMetricIds = useMemo(() => {
+    return [...new Set(results.map(r => r.id))]
   }, [results])
 
-  const singleColumns = [
-    { key: 'id', title: '指标ID', width: 100 },
-    { key: 'desc', title: '指标名称', width: 200 },
-    { key: 'formula', title: '公式', width: 200 },
-    { key: 'result', title: '结果', width: 100, align: 'right' as const, render: (v: any, row: any) => <span className={row.error ? 'text-red-500' : 'text-emerald-500 font-semibold'}>{row.error ? '错误' : fmt(v)}</span> },
-  ]
+  const singleColumns = useMemo(() => {
+    if (!singleMetricIds.length) return []
+    const cols: any[] = [
+      { key: 'rowInfo', title: '数据行', width: 220, sortable: true },
+    ]
+    singleMetricIds.forEach((id: string) => {
+      const desc = metricMap[id] || id
+      cols.push({
+        key: `val_${id}`,
+        title: `${id} ${desc}`,
+        width: 180,
+        align: 'right' as const,
+        render: (v: any, row: any) => <span className={row.errors?.[id] ? 'text-red-500' : 'text-emerald-500 font-semibold'}>{row.errors?.[id] ? '错误' : fmt(v)}</span>,
+      })
+    })
+    return cols
+  }, [singleMetricIds, metricMap])
+
+  const singleTableData = useMemo(() => {
+    if (!results.length || rowIndex === null) return []
+    const row = rows[rowIndex]
+    const obj: Record<string, any> = {
+      rowInfo: `${row?.[5] || ''} - ${row?.[10] || ''}`,
+      errors: {},
+    }
+    results.forEach(r => {
+      obj[`val_${r.id}`] = r.result
+      if (r.error) obj.errors[r.id] = true
+    })
+    return [obj]
+  }, [results, rowIndex, rows])
 
   const handleExport = () => {
     const exportData = mode === 'none' ? singleTableData : dimResult.data
@@ -171,9 +188,15 @@ export default function CalcGrid() {
 
     let csvContent = ''
     if (mode === 'none') {
-      csvContent = '指标ID,指标名称,公式,结果\n'
+      const cols = singleColumns
+      csvContent = cols.map((c: any) => c.title).join(',') + '\n'
       exportData.forEach((row: any) => {
-        csvContent += `${row.id},${row.desc},${row.formula},${row.error ? '错误' : fmt(row.result)}\n`
+        csvContent += cols.map((c: any) => {
+          const v = row[c.key]
+          if (v === null || v === undefined) return ''
+          const s = String(v).replace(/"/g, '""')
+          return /[",\n]/.test(s) ? `"${s}"` : s
+        }).join(',') + '\n'
       })
     } else {
       const cols = dimColumns
@@ -254,7 +277,7 @@ export default function CalcGrid() {
             columns={singleColumns}
             data={singleTableData}
             searchable
-            searchKeys={['id', 'desc']}
+            searchKeys={['rowInfo']}
             showTotal
           />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
@@ -267,7 +290,7 @@ export default function CalcGrid() {
                 <div className={`text-xl font-semibold mb-1 ${r.error ? 'text-red-500' : 'text-emerald-500'}`}>
                   {r.error ? `错误` : fmt(r.result)}
                 </div>
-                <div className="text-[11px] text-[hsl(var(--muted-foreground))] mb-2">{r.count}行数据</div>
+                <div className="text-[11px] text-[hsl(var(--muted-foreground))] mb-2">1行数据</div>
                 <div className="text-[11px] text-[hsl(var(--muted-foreground))] mb-2">公式: {r.formula}</div>
                 {r.steps?.length > 0 && (
                   <div className="bg-[hsl(var(--muted))] rounded-md p-2 space-y-0.5 mt-2">
