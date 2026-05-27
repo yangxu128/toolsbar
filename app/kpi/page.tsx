@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Upload, FileSpreadsheet, Calculator, GitCompareArrows, Home, ChevronRight, Star } from 'lucide-react'
+import { Upload, FileSpreadsheet, Calculator, GitCompareArrows, BarChart3, Home, ChevronRight, Star } from 'lucide-react'
 import { useKpiStore } from '@/lib/store'
 import { parseExcel } from '@/lib/calc'
 import { useFavStore } from '@/lib/fav-store'
@@ -11,12 +11,14 @@ import DataTable from '@/components/data-table'
 import MetricTable from '@/components/metric-table'
 import CalcGrid from '@/components/calc-grid'
 import CompareView from '@/components/compare-view'
+import DimSummary from '@/components/dim-summary'
 
 const tabs = [
   { key: 'upload', label: '文件上传', icon: Upload },
   { key: 'data', label: '原始数据', icon: FileSpreadsheet },
   { key: 'metrics', label: '指标公式', icon: FileSpreadsheet },
   { key: 'calc', label: '指标计算', icon: Calculator },
+  { key: 'dim', label: '维度汇总', icon: BarChart3 },
   { key: 'compare', label: '指标对比', icon: GitCompareArrows },
 ]
 
@@ -99,6 +101,7 @@ export default function KpiPage() {
           {activeKey === 'data' && loaded && <DataTable />}
           {activeKey === 'metrics' && loaded && <MetricTable />}
           {activeKey === 'calc' && loaded && <CalcGrid />}
+          {activeKey === 'dim' && loaded && <DimSummary />}
           {activeKey === 'compare' && loaded && <CompareView />}
         </div>
       </div>
