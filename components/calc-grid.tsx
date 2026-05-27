@@ -25,11 +25,18 @@ const dimOptions: { key: DimKey; label: string; desc: string }[] = [
 export default function CalcGrid() {
   const rows = useKpiStore((s) => s.rows)
   const headers = useKpiStore((s) => s.headers)
+  const metrics = useKpiStore((s) => s.metrics)
   const [mode, setMode] = useState<DimKey>('none')
   const [rowIndex, setRowIndex] = useState<number | null>(null)
   const [results, setResults] = useState<any[]>([])
   const [dimResult, setDimResult] = useState<{ metricIds: string[]; data: any[] }>({ metricIds: [], data: [] })
   const [loading, setLoading] = useState(false)
+
+  const metricMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    metrics.forEach(m => { map[m.id] = m.desc })
+    return map
+  }, [metrics])
 
   const findCol = (patterns: string[]): number => {
     for (let i = 0; i < headers.length; i++) {
@@ -70,7 +77,6 @@ export default function CalcGrid() {
         groups.get(key)!.rows.push(i)
       }
 
-      const { metrics } = useKpiStore.getState()
       const allCounterIds = new Set<string>()
       for (const m of metrics) {
         if (!m.formula) continue
@@ -128,16 +134,17 @@ export default function CalcGrid() {
       { key: 'count', title: '行数', width: 80, align: 'center' as const },
     ]
     dimResult.metricIds.forEach((id: string) => {
+      const desc = metricMap[id] || id
       cols.push({
         key: `sum_${id}`,
-        title: id,
-        width: 140,
+        title: `${id} ${desc}`,
+        width: 180,
         align: 'right' as const,
         render: (v: any) => <span className="tabular-nums text-xs">{fmt(v)}</span>,
       })
     })
     return cols
-  }, [dimResult, mode])
+  }, [dimResult, mode, metricMap])
 
   const singleTableData = useMemo(() => {
     return results.map(r => ({
@@ -153,7 +160,7 @@ export default function CalcGrid() {
 
   const singleColumns = [
     { key: 'id', title: '指标ID', width: 100 },
-    { key: 'desc', title: '描述', width: 160 },
+    { key: 'desc', title: '指标名称', width: 200 },
     { key: 'formula', title: '公式', width: 200 },
     { key: 'result', title: '结果', width: 100, align: 'right' as const, render: (v: any, row: any) => <span className={row.error ? 'text-red-500' : 'text-emerald-500 font-semibold'}>{row.error ? '错误' : fmt(v)}</span> },
   ]
@@ -164,7 +171,7 @@ export default function CalcGrid() {
 
     let csvContent = ''
     if (mode === 'none') {
-      csvContent = '指标ID,描述,公式,结果\n'
+      csvContent = '指标ID,指标名称,公式,结果\n'
       exportData.forEach((row: any) => {
         csvContent += `${row.id},${row.desc},${row.formula},${row.error ? '错误' : fmt(row.result)}\n`
       })
@@ -189,54 +196,60 @@ export default function CalcGrid() {
     URL.revokeObjectURL(a.href)
   }
 
+  const hasResult = mode === 'none' ? results.length > 0 : dimResult.data.length > 0
+
   return (
     <div className="space-y-3">
-      <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] p-4 flex items-end gap-3 flex-wrap">
-        <div className="flex-1 min-w-[160px]">
-          <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">计算模式</label>
-          <select value={mode} onChange={e => setMode(e.target.value as DimKey)}
-            className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
-            {dimOptions.map(d => <option key={d.key} value={d.key}>{d.label} — {d.desc}</option>)}
-          </select>
-        </div>
-
-        {mode === 'none' ? (
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">选择数据行</label>
-            <select value={rowIndex ?? ''} onChange={e => setRowIndex(e.target.value ? Number(e.target.value) : null)}
+      <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] p-4">
+        <div className="flex items-end gap-3 flex-wrap">
+          <div className="flex-1 min-w-[160px]">
+            <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">计算模式</label>
+            <select value={mode} onChange={e => setMode(e.target.value as DimKey)}
               className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
-              <option value="">选择数据行...</option>
-              {rows.map((r, i) => <option key={i} value={i}>{r[5] || ''} - {r[10] || ''}</option>)}
+              {dimOptions.map(d => <option key={d.key} value={d.key}>{d.label} — {d.desc}</option>)}
             </select>
           </div>
-        ) : (
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">列映射</label>
-            <div className="text-xs text-[hsl(var(--muted-foreground))] space-y-0.5">
-              {timeCol >= 0 ? <span className="text-emerald-500">开始时间列: [{timeCol}] {headers[timeCol]}</span> : <span className="text-red-400">未找到开始时间列</span>}
-              <br />
-              {subnetCol >= 0 ? <span className="text-emerald-500">子网名称列: [{subnetCol}] {headers[subnetCol]}</span> : <span className="text-red-400">未找到子网名称列</span>}
-            </div>
-          </div>
-        )}
 
-        <button
-          onClick={handleCalc}
-          disabled={loading || (mode === 'none' && rowIndex === null) || (mode === 'time' && timeCol < 0) || ((mode === 'subnet' || mode === 'city') && subnetCol < 0)}
-          className="flex items-center gap-1.5 px-4 py-2.5 bg-[hsl(var(--primary))] hover:opacity-90 disabled:opacity-40 text-white text-sm font-medium rounded-md transition-opacity"
-        >
-          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : mode === 'none' ? <Play className="w-3.5 h-3.5" /> : <BarChart3 className="w-3.5 h-3.5" />}
-          {mode === 'none' ? '计算' : '汇总计算'}
-        </button>
+          {mode === 'none' ? (
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">选择数据行</label>
+              <select value={rowIndex ?? ''} onChange={e => setRowIndex(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
+                <option value="">选择数据行...</option>
+                {rows.map((r, i) => <option key={i} value={i}>{r[5] || ''} - {r[10] || ''}</option>)}
+              </select>
+            </div>
+          ) : (
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">列映射</label>
+              <div className="text-xs text-[hsl(var(--muted-foreground))] space-y-0.5">
+                {timeCol >= 0 ? <span className="text-emerald-500">开始时间列: [{timeCol}] {headers[timeCol]}</span> : <span className="text-red-400">未找到开始时间列</span>}
+                <br />
+                {subnetCol >= 0 ? <span className="text-emerald-500">子网名称列: [{subnetCol}] {headers[subnetCol]}</span> : <span className="text-red-400">未找到子网名称列</span>}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCalc}
+              disabled={loading || (mode === 'none' && rowIndex === null) || (mode === 'time' && timeCol < 0) || ((mode === 'subnet' || mode === 'city') && subnetCol < 0)}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-[hsl(var(--primary))] hover:opacity-90 disabled:opacity-40 text-white text-sm font-medium rounded-md transition-opacity"
+            >
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : mode === 'none' ? <Play className="w-3.5 h-3.5" /> : <BarChart3 className="w-3.5 h-3.5" />}
+              {mode === 'none' ? '计算' : '汇总计算'}
+            </button>
+            {hasResult && (
+              <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-md transition-colors">
+                <Download className="w-3.5 h-3.5" /> 导出CSV
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {mode === 'none' && results.length > 0 && (
         <>
-          <div className="flex justify-end">
-            <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors">
-              <Download className="w-4 h-4" /> 导出CSV
-            </button>
-          </div>
           <UnifiedTable
             columns={singleColumns}
             data={singleTableData}
@@ -271,11 +284,6 @@ export default function CalcGrid() {
 
       {mode !== 'none' && dimResult.data.length > 0 && (
         <>
-          <div className="flex justify-end">
-            <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors">
-              <Download className="w-4 h-4" /> 导出CSV
-            </button>
-          </div>
           <UnifiedTable
             columns={dimColumns}
             data={dimResult.data}
@@ -289,7 +297,7 @@ export default function CalcGrid() {
                 g.steps?.[id] && (
                   <div key={`${id}-${idx}`} className="bg-[hsl(var(--card))] rounded-xl border border-[hsl(var(--border))] p-4">
                     <div className="flex items-start justify-between mb-2">
-                      <span className="font-mono text-xs font-medium text-[hsl(var(--primary))]">{id}</span>
+                      <span className="font-mono text-xs font-medium text-[hsl(var(--primary))]">{id} {metricMap[id] || ''}</span>
                       <span className="text-[11px] px-2 py-0.5 rounded-full bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]">{g.key}</span>
                     </div>
                     <div className="text-xl font-semibold mb-1 text-emerald-500">
