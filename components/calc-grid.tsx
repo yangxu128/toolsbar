@@ -40,7 +40,7 @@ export default function CalcGrid() {
   }
 
   const timeCol = useMemo(() => findCol(['开始时间', 'starttime', 'start_time', '时间']), [headers])
-  const subnetCol = useMemo(() => findCol(['子网名称', 'subnet', '子网', '网元名称']), [headers])
+  const subnetCol = useMemo(() => findCol(['子网名称', 'subnetname', 'subnet_name', '网元名称']), [headers])
 
   const handleCalc = () => {
     if (mode === 'none') {
