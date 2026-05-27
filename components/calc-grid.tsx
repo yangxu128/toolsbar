@@ -261,14 +261,13 @@ export default function CalcGrid() {
             {results.map((r, i) => (
               <div key={i} className="bg-[hsl(var(--card))] rounded-xl border border-[hsl(var(--border))] p-4">
                 <div className="flex items-start justify-between mb-2">
-                  <span className="font-mono text-xs font-medium text-[hsl(var(--primary))]">{r.id}</span>
-                  {!r.error && r.result !== null && (
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]">{r.desc.slice(0, 12)}</span>
-                  )}
+                  <span className="font-mono text-xs font-medium text-[hsl(var(--primary))]">{r.id} {r.desc}</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]">单行</span>
                 </div>
                 <div className={`text-xl font-semibold mb-1 ${r.error ? 'text-red-500' : 'text-emerald-500'}`}>
                   {r.error ? `错误` : fmt(r.result)}
                 </div>
+                <div className="text-[11px] text-[hsl(var(--muted-foreground))] mb-2">{r.count}行数据</div>
                 <div className="text-[11px] text-[hsl(var(--muted-foreground))] mb-2">公式: {r.formula}</div>
                 {r.steps?.length > 0 && (
                   <div className="bg-[hsl(var(--muted))] rounded-md p-2 space-y-0.5 mt-2">
