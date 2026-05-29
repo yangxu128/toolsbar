@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { UploadCloud, Save, FileSpreadsheet, X, Home, Star, ChevronRight as ChevronRightIcon, GitMerge, FolderOpen, CheckCircle2, AlertCircle, FolderInput } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
@@ -11,6 +11,7 @@ interface MergeGroup {
   files: string[]
   headers: string[]
   data: Record<string, string>[]
+  totalRows: number
 }
 
 type Encoding = 'auto' | 'gbk' | 'utf8' | 'utf8bom'
@@ -30,17 +31,18 @@ export default function CsvMergePage() {
   const [activeGroup, setActiveGroup] = useState<number>(0)
   const [logs, setLogs] = useState<string[]>([])
   const [processing, setProcessing] = useState(false)
-  const [encoding, setEncoding] = useState<Encoding>('gbk')
-  const [outputEncoding, setOutputEncoding] = useState<Encoding>('gbk')
+  const [encoding, setEncoding] = useState<Encoding>('utf8bom')
+  const [outputEncoding, setOutputEncoding] = useState<Encoding>('utf8bom')
   const [saving, setSaving] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const addLog = useCallback((msg: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`])
   }, [])
 
-  const parseCsvText = useCallback((text: string): { headers: string[]; rows: Record<string, string>[] } => {
-    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0)
-    if (lines.length === 0) return { headers: [], rows: [] }
+  const parseCsvText = useCallback((text: string): { headers: string[]; rows: Record<string, string>[]; rowCount: number } => {
+    const lines = text.split(/\r?\n/)
+    if (lines.length === 0) return { headers: [], rows: [], rowCount: 0 }
 
     const parseLine = (line: string): string[] => {
       const result: string[] = []
@@ -63,21 +65,32 @@ export default function CsvMergePage() {
     }
 
     const headers = parseLine(lines[0])
+    if (headers.length === 0) return { headers: [], rows: [], rowCount: 0 }
+
     const rows: Record<string, string>[] = []
+    let rowCount = 0
     for (let i = 1; i < lines.length; i++) {
-      const values = parseLine(lines[i])
+      const line = lines[i]
+      if (line.trim().length === 0) continue
+      const values = parseLine(line)
       const row: Record<string, string> = {}
       headers.forEach((h, idx) => { row[h] = values[idx] || '' })
       rows.push(row)
+      rowCount++
+      if (rows.length >= 5000) break
     }
-    return { headers, rows }
+    return { headers, rows, rowCount }
   }, [])
 
   const readFileWithEncoding = useCallback(async (file: File, enc: Encoding): Promise<string> => {
     const buffer = await file.arrayBuffer()
     if (enc === 'gbk') return new TextDecoder('gbk').decode(buffer)
     if (enc === 'utf8') return new TextDecoder('utf-8').decode(buffer)
-    if (enc === 'utf8bom') return new TextDecoder('utf-8').decode(buffer)
+    if (enc === 'utf8bom') {
+      const arr = new Uint8Array(buffer)
+      const start = arr.length >= 3 && arr[0] === 0xef && arr[1] === 0xbb && arr[2] === 0xbf ? 3 : 0
+      return new TextDecoder('utf-8').decode(arr.slice(start))
+    }
     try {
       const decoded = new TextDecoder('gbk').decode(buffer)
       if (/[\u4e00-\u9fa5]/.test(decoded)) return decoded
@@ -115,15 +128,22 @@ export default function CsvMergePage() {
 
       let mergedHeaders: string[] = []
       let mergedData: Record<string, string>[] = []
+      let totalRows = 0
 
       for (const { file, name } of fileItems) {
         try {
           const text = await readFileWithEncoding(file, encoding)
-          const { headers, rows } = parseCsvText(text)
+          const { headers, rows, rowCount } = parseCsvText(text)
           if (headers.length === 0) { addLog(`文件 ${name} 无有效数据`); continue }
           if (mergedHeaders.length === 0) mergedHeaders = headers
           mergedData = mergedData.concat(rows)
-          addLog(`读取 ${name}：${rows.length} 行`)
+          totalRows += rowCount
+          addLog(`读取 ${name}：${rowCount} 行`)
+          if (mergedData.length >= 5000) {
+            addLog(`分组数据量超过5000行，截断显示`)
+            mergedData = mergedData.slice(0, 5000)
+            break
+          }
         } catch (e: any) {
           addLog(`读取 ${name} 失败：${e.message}`)
         }
@@ -134,8 +154,9 @@ export default function CsvMergePage() {
         files: fileItems.map(f => f.name),
         headers: mergedHeaders,
         data: mergedData,
+        totalRows,
       })
-      addLog(`分组 [${prefix}...] 合并完成：共 ${mergedData.length} 行`)
+      addLog(`分组 [${prefix}...] 合并完成：共 ${totalRows} 行`)
     }
 
     setGroups(result)
@@ -158,63 +179,46 @@ export default function CsvMergePage() {
   }, [])
 
   const generateCsvContent = useCallback((group: MergeGroup): string => {
-    if (!group.headers.length || !group.data.length) return ''
+    if (!group.headers.length) return ''
     const escape = (v: string) => /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
-    return [
-      group.headers.map(escape).join(','),
-      ...group.data.map(row => group.headers.map(h => escape(row[h] || '')).join(','))
-    ].join('\r\n')
+    const lines: string[] = [group.headers.map(escape).join(',')]
+    for (const row of group.data) {
+      lines.push(group.headers.map(h => escape(row[h] || '')).join(','))
+    }
+    return lines.join('\r\n')
   }, [])
 
-  const handleSaveAll = useCallback(async () => {
-    if (groups.length === 0) return
-    setSaving(true)
-    try {
-      const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite', startIn: 'downloads' })
-      for (const group of groups) {
-        if (!group.data.length) continue
-        const content = generateCsvContent(group)
-        const data = encodeOutput(content, outputEncoding)
-        const fileName = `${group.prefix}合并.csv`
-        const fileHandle = await dirHandle.getFileHandle(fileName, { create: true })
-        const writable = await fileHandle.createWritable()
-        await writable.write(data)
-        await writable.close()
-        addLog(`已保存：${dirHandle.name}/${fileName} (${group.data.length}行, ${outputEncoding.toUpperCase()})`)
-      }
-      addLog('全部文件已保存到选定目录')
-    } catch (e: any) {
-      if (e.name === 'AbortError') {
-        addLog('用户取消了目录选择')
-      } else {
-        addLog(`保存失败：${e.message}`)
-      }
-    }
-    setSaving(false)
-  }, [groups, outputEncoding, generateCsvContent, encodeOutput, addLog])
+  const getDownloadUrl = useCallback((group: MergeGroup): string => {
+    const content = generateCsvContent(group)
+    const data = encodeOutput(content, outputEncoding)
+    const blob = new Blob([data.buffer as ArrayBuffer], { type: 'text/csv' })
+    return URL.createObjectURL(blob)
+  }, [generateCsvContent, encodeOutput, outputEncoding])
 
-  const handleSaveSingle = useCallback(async (group: MergeGroup) => {
+  const handleSaveAll = useCallback(() => {
+    if (groups.length === 0) return
+    groups.forEach(group => {
+      if (!group.data.length) return
+      const url = getDownloadUrl(group)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${group.prefix}合并.csv`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    })
+    addLog('全部文件已下载到浏览器默认下载目录')
+  }, [groups, getDownloadUrl, addLog])
+
+  const handleSaveSingle = useCallback((group: MergeGroup) => {
     if (!group.data.length) return
-    setSaving(true)
-    try {
-      const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite', startIn: 'downloads' })
-      const content = generateCsvContent(group)
-      const data = encodeOutput(content, outputEncoding)
-      const fileName = `${group.prefix}合并.csv`
-      const fileHandle = await dirHandle.getFileHandle(fileName, { create: true })
-      const writable = await fileHandle.createWritable()
-      await writable.write(data)
-      await writable.close()
-      addLog(`已保存：${dirHandle.name}/${fileName} (${group.data.length}行, ${outputEncoding.toUpperCase()})`)
-    } catch (e: any) {
-      if (e.name === 'AbortError') {
-        addLog('用户取消了目录选择')
-      } else {
-        addLog(`保存失败：${e.message}`)
-      }
-    }
-    setSaving(false)
-  }, [outputEncoding, generateCsvContent, encodeOutput, addLog])
+    const url = getDownloadUrl(group)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${group.prefix}合并.csv`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    addLog(`已下载：${group.prefix}合并.csv`)
+  }, [getDownloadUrl, addLog])
 
   const currentGroup = groups[activeGroup]
   const columns = currentGroup?.headers.map(h => ({ key: h, title: h, width: 150 })) || []
@@ -251,7 +255,7 @@ export default function CsvMergePage() {
 
         <div className="p-6 sm:p-8">
           {groups.length === 0 ? (
-            <UploadArea onUpload={handleUpload} processing={processing} encoding={encoding} onEncodingChange={setEncoding} />
+            <UploadArea onUpload={handleUpload} processing={processing} encoding={encoding} onEncodingChange={setEncoding} fileInputRef={fileInputRef} />
           ) : (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -265,7 +269,7 @@ export default function CsvMergePage() {
                           ? 'bg-teal-500 text-white'
                           : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--border))]'
                       }`}>
-                      <FolderOpen className="w-3 h-3 inline mr-1" />{g.prefix}... ({g.data.length}行)
+                      <FolderOpen className="w-3 h-3 inline mr-1" />{g.prefix}... ({g.totalRows}行)
                     </button>
                   ))}
                 </div>
@@ -274,13 +278,13 @@ export default function CsvMergePage() {
                     className="px-2 py-1.5 rounded-lg border border-[hsl(var(--border))] text-xs outline-none focus:border-teal-500 bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
                     {(Object.keys(encLabels) as Encoding[]).map(k => <option key={k} value={k}>{encLabels[k]}</option>)}
                   </select>
-                  <button onClick={() => handleSaveSingle(currentGroup)} disabled={saving}
+                  <button onClick={() => currentGroup && handleSaveSingle(currentGroup)} disabled={saving}
                     className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
-                    <Save className="w-4 h-4" /> 保存当前组
+                    <Save className="w-4 h-4" /> 下载当前组
                   </button>
                   <button onClick={handleSaveAll} disabled={saving}
                     className="flex items-center gap-1.5 px-3 py-2 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
-                    <FolderInput className="w-4 h-4" /> 全部保存到目录
+                    <FolderInput className="w-4 h-4" /> 全部下载
                   </button>
                 </div>
               </div>
@@ -291,11 +295,16 @@ export default function CsvMergePage() {
                     {currentGroup.files.length} 个文件
                   </span>
                   <span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium">
-                    {currentGroup.data.length} 行数据
+                    {currentGroup.totalRows} 行数据
                   </span>
                   <span className="text-xs px-2.5 py-1 rounded-full bg-violet-50 dark:bg-violet-900/30 text-violet-600 font-medium">
                     {currentGroup.headers.length} 列
                   </span>
+                  {currentGroup.data.length >= 5000 && (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-600 font-medium">
+                      显示前5000行
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -319,7 +328,7 @@ export default function CsvMergePage() {
                 </div>
               )}
 
-              <button onClick={() => { setGroups([]); setLogs([]) }} className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors">
+              <button onClick={() => { setGroups([]); setLogs([]); if (fileInputRef.current) fileInputRef.current.value = '' }} className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors">
                 <X className="w-3.5 h-3.5" /> 清除数据，重新上传
               </button>
             </div>
@@ -341,11 +350,12 @@ export default function CsvMergePage() {
   )
 }
 
-function UploadArea({ onUpload, processing, encoding, onEncodingChange }: {
+function UploadArea({ onUpload, processing, encoding, onEncodingChange, fileInputRef }: {
   onUpload: (files: FileList) => void
   processing: boolean
   encoding: Encoding
   onEncodingChange: (e: Encoding) => void
+  fileInputRef: React.RefObject<HTMLInputElement | null>
 }) {
   const [dragging, setDragging] = useState(false)
 
@@ -362,11 +372,11 @@ function UploadArea({ onUpload, processing, encoding, onEncodingChange }: {
       <div onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length > 0) onUpload(e.dataTransfer.files) }}
-        onClick={() => document.getElementById('csv-merge-input')?.click()}
+        onClick={() => fileInputRef.current?.click()}
         className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors ${
           dragging ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)]' : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary))]'
         }`}>
-        <input id="csv-merge-input" type="file" accept=".csv" multiple
+        <input ref={fileInputRef} id="csv-merge-input" type="file" accept=".csv" multiple
           onChange={(e) => e.target.files && e.target.files.length > 0 && onUpload(e.target.files)} className="hidden" />
         <div className="w-16 h-16 rounded-2xl bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center mx-auto mb-4">
           {processing ? (
@@ -395,10 +405,10 @@ function UploadArea({ onUpload, processing, encoding, onEncodingChange }: {
           <p>• 编码支持：GBK、UTF-8、UTF-8 BOM、自动检测</p>
           <p>• 分组规则：按文件名前20个字符匹配，如 FDD-ZX-MRO-xxx 和 FDD-ZX-MRO-yyy 会合并</p>
           <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
-          <p>1. 选择读取编码（中文文件通常选 GBK）</p>
+          <p>1. 选择读取编码（默认 UTF-8 BOM）</p>
           <p>2. 拖拽或选择多个 CSV 文件上传</p>
           <p>3. 系统自动按文件名分组并合并，显示每组行数</p>
-          <p>4. 选择输出编码，点击「保存到目录」将合并结果保存到本地文件夹</p>
+          <p>4. 点击「下载」按钮，文件自动保存到浏览器默认下载目录</p>
         </div>
       </div>
     </div>
