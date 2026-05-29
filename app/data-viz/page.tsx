@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   BarChart3, UploadCloud, Download, Home, Star, ChevronRight,
   X, TrendingUp, BarChart2, PieChart, Activity, Grid3X3,
-  FileSpreadsheet, AlertCircle, CheckCircle2, Loader2
+  FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, Settings2
 } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
@@ -15,6 +15,17 @@ interface DataRow {
   [key: string]: string | number
 }
 
+interface ChartConfig {
+  title: string
+  width: number
+  height: number
+  showGrid: boolean
+  showLegend: boolean
+  legendPos: 'top' | 'bottom' | 'left' | 'right'
+  showLabels: boolean
+  colorScheme: string
+}
+
 const chartOptions: { key: ChartType; label: string; icon: any; desc: string }[] = [
   { key: 'line', label: '折线图', icon: TrendingUp, desc: '展示数据趋势变化' },
   { key: 'bar', label: '柱状图', icon: BarChart2, desc: '对比不同类别数据' },
@@ -22,6 +33,13 @@ const chartOptions: { key: ChartType; label: string; icon: any; desc: string }[]
   { key: 'scatter', label: '散点图', icon: Grid3X3, desc: '分析变量相关性' },
   { key: 'area', label: '面积图', icon: Activity, desc: '展示累积趋势' },
 ]
+
+const colorSchemes: Record<string, string[]> = {
+  default: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16'],
+  warm: ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6'],
+  cool: ['#0ea5e9', '#06b6d4', '#14b8a6', '#10b981', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7'],
+  gray: ['#1f2937', '#374151', '#4b5563', '#6b7280', '#9ca3af', '#d1d5db', '#e5e7eb', '#f3f4f6'],
+}
 
 export default function DataVizPage() {
   const isFav = useFavStore((s) => s.isFav)
@@ -36,6 +54,17 @@ export default function DataVizPage() {
   const [groupBy, setGroupBy] = useState('')
   const [logs, setLogs] = useState<string[]>([])
   const [processing, setProcessing] = useState(false)
+  const [showConfig, setShowConfig] = useState(false)
+  const [config, setConfig] = useState<ChartConfig>({
+    title: '',
+    width: 800,
+    height: 400,
+    showGrid: true,
+    showLegend: true,
+    legendPos: 'top',
+    showLabels: true,
+    colorScheme: 'default',
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const addLog = useCallback((msg: string) => {
@@ -104,6 +133,7 @@ export default function DataVizPage() {
       setData(rows)
       setXAxis(headers[0])
       setYAxis(numericHeaders[0] || headers[1] || headers[0])
+      setConfig(prev => ({ ...prev, title: `${headers[1] || ''} 按 ${headers[0]} 分布` }))
       addLog(`读取 ${file.name}：${rows.length} 行 × ${headers.length} 列`)
       if (rows.length >= 5000) addLog('数据量超过5000行，已截断显示')
     } catch (e: any) {
@@ -167,7 +197,7 @@ export default function DataVizPage() {
     return Math.max(...chartData.datasets.flatMap(d => d.data))
   }, [chartData])
 
-  const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16']
+  const colors = colorSchemes[config.colorScheme] || colorSchemes.default
 
   return (
     <div>
@@ -231,7 +261,8 @@ export default function DataVizPage() {
                   <p>1. 准备 CSV 数据文件（可参考下方模板）</p>
                   <p>2. 上传文件，系统自动解析列名和数据</p>
                   <p>3. 选择图表类型、X轴、Y轴、分组字段</p>
-                  <p>4. 图表实时渲染，支持导出 SVG</p>
+                  <p>4. 点击「图表设置」调整标题、颜色、尺寸等属性</p>
+                  <p>5. 图表实时渲染，支持导出 SVG</p>
                 </div>
               </div>
 
@@ -274,7 +305,65 @@ export default function DataVizPage() {
                     )
                   })}
                 </div>
+                <button onClick={() => setShowConfig(!showConfig)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    showConfig ? 'bg-orange-500 text-white' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--border))]'
+                  }`}>
+                  <Settings2 className="w-3.5 h-3.5" />图表设置
+                </button>
               </div>
+
+              {showConfig && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 rounded-xl bg-[hsl(var(--muted))] border border-[hsl(var(--border))]">
+                  <div>
+                    <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">图表标题</label>
+                    <input type="text" value={config.title} onChange={e => setConfig(prev => ({ ...prev, title: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm bg-[hsl(var(--card))] text-[hsl(var(--foreground))]" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">宽度</label>
+                    <input type="number" value={config.width} onChange={e => setConfig(prev => ({ ...prev, width: Number(e.target.value) }))}
+                      className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm bg-[hsl(var(--card))] text-[hsl(var(--foreground))]" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">高度</label>
+                    <input type="number" value={config.height} onChange={e => setConfig(prev => ({ ...prev, height: Number(e.target.value) }))}
+                      className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm bg-[hsl(var(--card))] text-[hsl(var(--foreground))]" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">配色方案</label>
+                    <select value={config.colorScheme} onChange={e => setConfig(prev => ({ ...prev, colorScheme: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
+                      <option value="default">默认</option>
+                      <option value="warm">暖色</option>
+                      <option value="cool">冷色</option>
+                      <option value="gray">灰度</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="showGrid" checked={config.showGrid} onChange={e => setConfig(prev => ({ ...prev, showGrid: e.target.checked }))} />
+                    <label htmlFor="showGrid" className="text-xs text-[hsl(var(--foreground))]">显示网格</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="showLegend" checked={config.showLegend} onChange={e => setConfig(prev => ({ ...prev, showLegend: e.target.checked }))} />
+                    <label htmlFor="showLegend" className="text-xs text-[hsl(var(--foreground))]">显示图例</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="showLabels" checked={config.showLabels} onChange={e => setConfig(prev => ({ ...prev, showLabels: e.target.checked }))} />
+                    <label htmlFor="showLabels" className="text-xs text-[hsl(var(--foreground))]">显示数值标签</label>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">图例位置</label>
+                    <select value={config.legendPos} onChange={e => setConfig(prev => ({ ...prev, legendPos: e.target.value as any }))}
+                      className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
+                      <option value="top">顶部</option>
+                      <option value="bottom">底部</option>
+                      <option value="left">左侧</option>
+                      <option value="right">右侧</option>
+                    </select>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
@@ -304,13 +393,13 @@ export default function DataVizPage() {
               {chartData && (
                 <div className="bg-[hsl(var(--muted))] rounded-xl border border-[hsl(var(--border))] p-4">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-[hsl(var(--foreground))]">{yAxis} 按 {xAxis} 分布</h3>
+                    <h3 className="text-sm font-semibold text-[hsl(var(--foreground))]">{config.title || `${yAxis} 按 ${xAxis} 分布`}</h3>
                     <button onClick={handleExportChart} className="text-xs text-[hsl(var(--primary))] hover:underline flex items-center gap-1">
                       <Download className="w-3 h-3" /> 导出SVG
                     </button>
                   </div>
                   <div id="viz-chart" className="w-full overflow-x-auto">
-                    <SvgChart type={chartType} data={chartData} colors={colors} maxVal={maxVal} />
+                    <SvgChart type={chartType} data={chartData} colors={colors} maxVal={maxVal} config={config} />
                   </div>
                 </div>
               )}
@@ -358,10 +447,18 @@ export default function DataVizPage() {
   )
 }
 
-function SvgChart({ type, data, colors, maxVal }: { type: ChartType; data: any; colors: string[]; maxVal: number }) {
-  const width = 800
-  const height = 320
-  const padding = { top: 20, right: 20, bottom: 60, left: 60 }
+function SvgChart({ type, data, colors, maxVal, config }: { type: ChartType; data: any; colors: string[]; maxVal: number; config: ChartConfig }) {
+  const width = config.width
+  const height = config.height
+  const legendH = config.showLegend && (config.legendPos === 'top' || config.legendPos === 'bottom') ? 30 : 0
+  const legendW = config.showLegend && (config.legendPos === 'left' || config.legendPos === 'right') ? 100 : 0
+  const titleH = config.title ? 30 : 0
+  const padding = {
+    top: 20 + titleH + (config.legendPos === 'top' ? legendH : 0),
+    right: 20 + (config.legendPos === 'right' ? legendW : 0),
+    bottom: 60 + (config.legendPos === 'bottom' ? legendH : 0),
+    left: 60 + (config.legendPos === 'left' ? legendW : 0),
+  }
   const chartW = width - padding.left - padding.right
   const chartH = height - padding.top - padding.bottom
 
@@ -370,15 +467,23 @@ function SvgChart({ type, data, colors, maxVal }: { type: ChartType; data: any; 
   const labels = data.labels as string[]
   const datasets = data.datasets as { name: string; data: number[] }[]
 
+  const avgLabelLen = labels.reduce((sum, l) => sum + l.length, 0) / labels.length
+  const shouldRotate = avgLabelLen * 10 > chartW / labels.length
+
   if (type === 'pie') {
     const total = datasets[0].data.reduce((a: number, b: number) => a + b, 0)
     let startAngle = 0
-    const cx = width / 2
-    const cy = height / 2
-    const r = Math.min(chartW, chartH) / 2 - 10
+    const cx = padding.left + chartW / 2
+    const cy = padding.top + chartH / 2
+    const r = Math.min(chartW, chartH) / 2 - 20
 
     return (
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ maxWidth: 600 }}>
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ maxWidth: width }}>
+        {config.title && (
+          <text x={width / 2} y={titleH - 5} textAnchor="middle" fill="currentColor" fontSize={14} fontWeight={600}>
+            {config.title}
+          </text>
+        )}
         {datasets[0].data.map((val: number, i: number) => {
           const angle = (val / total) * 2 * Math.PI
           const endAngle = startAngle + angle
@@ -391,21 +496,26 @@ function SvgChart({ type, data, colors, maxVal }: { type: ChartType; data: any; 
           const midAngle = startAngle + angle / 2
           const tx = cx + (r * 0.7) * Math.cos(midAngle)
           const ty = cy + (r * 0.7) * Math.sin(midAngle)
-          const labelX = cx + (r + 30) * Math.cos(midAngle)
-          const labelY = cy + (r + 30) * Math.sin(midAngle)
+          const labelX = cx + (r + 35) * Math.cos(midAngle)
+          const labelY = cy + (r + 35) * Math.sin(midAngle)
           startAngle = endAngle
           return (
             <g key={i}>
               <path d={d} fill={colors[i % colors.length]} stroke="white" strokeWidth={2} />
-              <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={11} fontWeight={600}>
-                {((val / total) * 100).toFixed(1)}%
-              </text>
+              {config.showLabels && (
+                <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={11} fontWeight={600}>
+                  {((val / total) * 100).toFixed(1)}%
+                </text>
+              )}
               <text x={labelX} y={labelY} textAnchor={midAngle > Math.PI ? 'end' : 'start'} dominantBaseline="middle" fill="currentColor" fontSize={10}>
                 {labels[i]}
               </text>
             </g>
           )
         })}
+        {config.showLegend && (
+          <Legend datasets={datasets} colors={colors} pos={config.legendPos} width={width} height={height} padding={padding} />
+        )}
       </svg>
     )
   }
@@ -417,9 +527,15 @@ function SvgChart({ type, data, colors, maxVal }: { type: ChartType; data: any; 
   const getY = (v: number) => padding.top + chartH - v * yScale
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ maxWidth: 800 }}>
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ maxWidth: width }}>
+      {config.title && (
+        <text x={width / 2} y={titleH - 5} textAnchor="middle" fill="currentColor" fontSize={14} fontWeight={600}>
+          {config.title}
+        </text>
+      )}
+
       {/* Grid */}
-      {[0, 0.25, 0.5, 0.75, 1].map(p => {
+      {config.showGrid && [0, 0.25, 0.5, 0.75, 1].map(p => {
         const y = padding.top + chartH * p
         const val = maxVal * (1 - p)
         return (
@@ -432,7 +548,8 @@ function SvgChart({ type, data, colors, maxVal }: { type: ChartType; data: any; 
 
       {/* X labels */}
       {labels.map((l, i) => (
-        <text key={i} x={getX(i)} y={height - padding.bottom + 20} textAnchor="middle" fill="currentColor" fontSize={10} opacity={0.7} transform={`rotate(-30, ${getX(i)}, ${height - padding.bottom + 20})`}>
+        <text key={i} x={getX(i)} y={height - padding.bottom + 20} textAnchor="middle" fill="currentColor" fontSize={10} opacity={0.7}
+          transform={shouldRotate ? `rotate(-30, ${getX(i)}, ${height - padding.bottom + 20})` : undefined}>
           {l}
         </text>
       ))}
@@ -450,6 +567,9 @@ function SvgChart({ type, data, colors, maxVal }: { type: ChartType; data: any; 
               {ds.data.map((v, i) => (
                 <circle key={i} cx={getX(i)} cy={getY(v)} r={3} fill={color} />
               ))}
+              {config.showLabels && ds.data.map((v, i) => (
+                <text key={`label-${i}`} x={getX(i)} y={getY(v) - 8} textAnchor="middle" fill={color} fontSize={9} fontWeight={600}>{v}</text>
+              ))}
             </g>
           )
         }
@@ -459,7 +579,12 @@ function SvgChart({ type, data, colors, maxVal }: { type: ChartType; data: any; 
           return (
             <g key={di}>
               {ds.data.map((v, i) => (
-                <rect key={i} x={getX(i) - xStep / 2 + di * barW + barW / 2} y={getY(v)} width={barW - 2} height={padding.top + chartH - getY(v)} fill={color} rx={2} />
+                <g key={i}>
+                  <rect x={getX(i) - xStep / 2 + di * barW + barW / 2} y={getY(v)} width={barW - 2} height={padding.top + chartH - getY(v)} fill={color} rx={2} />
+                  {config.showLabels && (
+                    <text x={getX(i) - xStep / 2 + di * barW + barW / 2 + (barW - 2) / 2} y={getY(v) - 5} textAnchor="middle" fill={color} fontSize={9} fontWeight={600}>{v}</text>
+                  )}
+                </g>
               ))}
             </g>
           )
@@ -478,13 +603,79 @@ function SvgChart({ type, data, colors, maxVal }: { type: ChartType; data: any; 
         return null
       })}
 
-      {/* Legend */}
-      {datasets.map((ds, i) => (
-        <g key={i} transform={`translate(${width - padding.right - 100}, ${padding.top + i * 20})`}>
-          <rect x={0} y={-6} width={12} height={12} fill={colors[i % colors.length]} rx={2} />
-          <text x={18} y={3} fill="currentColor" fontSize={10}>{ds.name}</text>
-        </g>
-      ))}
+      {config.showLegend && (
+        <Legend datasets={datasets} colors={colors} pos={config.legendPos} width={width} height={height} padding={padding} />
+      )}
     </svg>
   )
+}
+
+function Legend({ datasets, colors, pos, width, height, padding }: {
+  datasets: { name: string; data: number[] }[]
+  colors: string[]
+  pos: string
+  width: number
+  height: number
+  padding: { top: number; right: number; bottom: number; left: number }
+}) {
+  const itemW = 80
+  const itemH = 20
+
+  if (pos === 'top') {
+    const totalW = datasets.length * itemW
+    const startX = (width - totalW) / 2
+    return (
+      <g>
+        {datasets.map((ds, i) => (
+          <g key={i} transform={`translate(${startX + i * itemW}, ${padding.top - 25})`}>
+            <rect x={0} y={-6} width={12} height={12} fill={colors[i % colors.length]} rx={2} />
+            <text x={18} y={3} fill="currentColor" fontSize={10}>{ds.name}</text>
+          </g>
+        ))}
+      </g>
+    )
+  }
+
+  if (pos === 'bottom') {
+    const totalW = datasets.length * itemW
+    const startX = (width - totalW) / 2
+    return (
+      <g>
+        {datasets.map((ds, i) => (
+          <g key={i} transform={`translate(${startX + i * itemW}, ${height - padding.bottom + 35})`}>
+            <rect x={0} y={-6} width={12} height={12} fill={colors[i % colors.length]} rx={2} />
+            <text x={18} y={3} fill="currentColor" fontSize={10}>{ds.name}</text>
+          </g>
+        ))}
+      </g>
+    )
+  }
+
+  if (pos === 'left') {
+    return (
+      <g>
+        {datasets.map((ds, i) => (
+          <g key={i} transform={`translate(${padding.left - 90}, ${padding.top + i * itemH})`}>
+            <rect x={0} y={-6} width={12} height={12} fill={colors[i % colors.length]} rx={2} />
+            <text x={18} y={3} fill="currentColor" fontSize={10}>{ds.name}</text>
+          </g>
+        ))}
+      </g>
+    )
+  }
+
+  if (pos === 'right') {
+    return (
+      <g>
+        {datasets.map((ds, i) => (
+          <g key={i} transform={`translate(${width - padding.right + 10}, ${padding.top + i * itemH})`}>
+            <rect x={0} y={-6} width={12} height={12} fill={colors[i % colors.length]} rx={2} />
+            <text x={18} y={3} fill="currentColor" fontSize={10}>{ds.name}</text>
+          </g>
+        ))}
+      </g>
+    )
+  }
+
+  return null
 }
