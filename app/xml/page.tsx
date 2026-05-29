@@ -135,8 +135,17 @@ function UploadArea({ onUpload, error }: { onUpload: (f: File) => void; error: s
         </button>
       </div>
       {error && <div className="mt-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-xs">{error}</div>}
-      <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))]">
-        <p className="flex items-center gap-2"><FileCode className="w-4 h-4" /> 支持结构：FieldName/FieldValue · smr/v · 通用标签 · CSV(|分隔)</p>
+      <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))] space-y-2">
+        <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
+        <div className="text-[11px] space-y-1">
+          <p><strong className="text-[hsl(var(--foreground))]">支持格式：</strong>XML 文件 或 CSV 文件（| 分隔）</p>
+          <p>• XML：自动识别 FieldName/FieldValue、smr/v、通用标签等多种结构</p>
+          <p>• CSV：表头和数据值用 | 符号分隔，如 字段名1|字段名2|...</p>
+          <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
+          <p>1. 点击上传区域或拖拽文件到虚线框内</p>
+          <p>2. 系统自动解析并展示为表格，支持搜索、排序、分页</p>
+          <p>3. 可导出为 CSV 文件，点击「清除数据」可重新上传</p>
+        </div>
       </div>
     </div>
   )

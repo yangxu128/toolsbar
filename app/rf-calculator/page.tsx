@@ -58,6 +58,19 @@ export default function RfCalculatorPage() {
         </div>
 
         <div className="p-6 sm:p-8">
+          <div className="mb-4 p-4 rounded-xl bg-[hsl(var(--muted))] border border-[hsl(var(--border))] space-y-2">
+            <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
+            <div className="text-[11px] text-[hsl(var(--muted-foreground))] space-y-1">
+              <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>4G/5G 无线通信参数查询与换算工具</p>
+              <p>• LTE EARFCN：EARFCN 与中心频率互转，支持 Band 查询</p>
+              <p>• 5G NR-ARFCN：NR-ARFCN 与频率互转，支持全局栅格计算</p>
+              <p>• 4G ECI：ECI 编解码，eNB ID + Cell ID ↔ ECI</p>
+              <p>• 5G NCI：NCI 编解码，gNB ID + Cell ID ↔ NCI（支持自定义位长）</p>
+              <p>• 频段参考：完整的 LTE/5G 频段参数速查表</p>
+              <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong>选择对应 Tab，输入参数后点击计算，结果实时显示在下方</p>
+            </div>
+          </div>
+
           <div className="flex gap-2 mb-6 flex-wrap">
             {tabs.map(tab => {
               const Icon = tab.icon

@@ -388,10 +388,18 @@ function UploadArea({ onUpload, processing, encoding, onEncodingChange }: {
         )}
       </div>
 
-      <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))] space-y-1.5">
-        <p className="flex items-center gap-2"><GitMerge className="w-4 h-4" /> 按文件名前20位字符自动分组</p>
-        <p className="flex items-center gap-2"><FileSpreadsheet className="w-4 h-4" /> 支持手动指定或自动检测 GBK / UTF-8 编码</p>
-        <p className="flex items-center gap-2"><FolderInput className="w-4 h-4" /> 合并后通过系统目录选择器直接保存到本地</p>
+      <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))] space-y-2">
+        <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
+        <div className="text-[11px] space-y-1">
+          <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong>多个 CSV 文件，文件名前20位相同的会自动分为一组</p>
+          <p>• 编码支持：GBK、UTF-8、UTF-8 BOM、自动检测</p>
+          <p>• 分组规则：按文件名前20个字符匹配，如 FDD-ZX-MRO-xxx 和 FDD-ZX-MRO-yyy 会合并</p>
+          <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
+          <p>1. 选择读取编码（中文文件通常选 GBK）</p>
+          <p>2. 拖拽或选择多个 CSV 文件上传</p>
+          <p>3. 系统自动按文件名分组并合并，显示每组行数</p>
+          <p>4. 选择输出编码，点击「保存到目录」将合并结果保存到本地文件夹</p>
+        </div>
       </div>
     </div>
   )
