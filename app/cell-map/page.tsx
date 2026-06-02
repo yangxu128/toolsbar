@@ -71,11 +71,11 @@ export default function CellMapPage() {
       const map = L.map(mapRef.current).setView([39.89945, 116.40769], 12)
 
       const vecLayer = L.tileLayer(
-        `https://t{t}.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=${tiandituKey}`,
+        `https://t{s}.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=${tiandituKey}`,
         { subdomains: '0123', attribution: '天地图' }
       )
       const ciaLayer = L.tileLayer(
-        `https://t{t}.tianditu.gov.cn/DataServer?T=cia_w&x={x}&y={y}&l={z}&tk=${tiandituKey}`,
+        `https://t{s}.tianditu.gov.cn/DataServer?T=cia_w&x={x}&y={y}&l={z}&tk=${tiandituKey}`,
         { subdomains: '0123' }
       )
       vecLayer.addTo(map)
