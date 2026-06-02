@@ -9,12 +9,6 @@ import {
 } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
-declare global {
-  interface Window {
-    T: any
-  }
-}
-
 interface CellData {
   lat: number
   lng: number
@@ -42,7 +36,7 @@ export default function CellMapPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstance = useRef<any>(null)
-  const markersRef = useRef<any[]>([])
+  const layersRef = useRef<any[]>([])
 
   const addLog = useCallback((msg: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`])
@@ -63,71 +57,69 @@ export default function CellMapPage() {
   const initMap = useCallback(() => {
     if (!mapRef.current || !tiandituKey || mapInstance.current) return
 
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+    document.head.appendChild(link)
+
     const script = document.createElement('script')
-    script.src = `https://api.tianditu.gov.cn/api?v=4.0&tk=${tiandituKey}`
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
     script.onload = () => {
-      if (window.T && mapRef.current) {
-        mapInstance.current = new window.T.Map(mapRef.current)
-        mapInstance.current.centerAndZoom(new window.T.LngLat(116.40769, 39.89945), 12)
-        setMapLoaded(true)
-        addLog('天地图加载成功')
-        if (cells.length > 0) drawCells()
-      }
+      const L = (window as any).L
+      if (!L || !mapRef.current) return
+
+      const map = L.map(mapRef.current).setView([39.89945, 116.40769], 12)
+
+      const vecLayer = L.tileLayer(
+        `https://t{t}.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=${tiandituKey}`,
+        { subdomains: '0123', attribution: '天地图' }
+      )
+      const ciaLayer = L.tileLayer(
+        `https://t{t}.tianditu.gov.cn/DataServer?T=cia_w&x={x}&y={y}&l={z}&tk=${tiandituKey}`,
+        { subdomains: '0123' }
+      )
+      vecLayer.addTo(map)
+      ciaLayer.addTo(map)
+
+      mapInstance.current = map
+      setMapLoaded(true)
+      addLog('天地图加载成功')
+      if (cells.length > 0) drawCells()
     }
     script.onerror = () => {
-      addLog('天地图加载失败，请检查Key是否正确')
+      addLog('Leaflet加载失败，请检查网络')
     }
     document.head.appendChild(script)
   }, [tiandituKey, cells, addLog])
 
   const drawCells = useCallback(() => {
-    if (!mapInstance.current || !window.T) return
+    const L = (window as any).L
+    const map = mapInstance.current
+    if (!L || !map) return
 
-    markersRef.current.forEach(m => mapInstance.current.removeOverLay(m))
-    markersRef.current = []
+    layersRef.current.forEach(l => map.removeLayer(l))
+    layersRef.current = []
 
-    cells.forEach((cell, idx) => {
-      const center = new window.T.LngLat(cell.lng, cell.lat)
-
-      const marker = new window.T.Marker(center, {
-        title: cell.name || `小区${idx + 1}`
-      })
-      mapInstance.current.addOverLay(marker)
-      markersRef.current.push(marker)
+    cells.forEach((cell) => {
+      const marker = L.marker([cell.lat, cell.lng]).addTo(map)
+      marker.bindTooltip(cell.name || '', { permanent: true, direction: 'top', offset: [0, -8], className: 'cell-label' })
+      layersRef.current.push(marker)
 
       const sectorPoints = calcSectorPoints(cell.lat, cell.lng, cell.azimuth, 0.3)
-      const polygon = new window.T.Polygon(sectorPoints.map((p: any) => new window.T.LngLat(p.lng, p.lat)), {
-        color: '#3b82f6',
-        weight: 2,
-        opacity: 0.8,
-        fillColor: '#3b82f6',
-        fillOpacity: 0.3
-      })
-      mapInstance.current.addOverLay(polygon)
-      markersRef.current.push(polygon)
-
-      try {
-        const label = new window.T.Label({
-          text: cell.name || `小区${idx + 1}`,
-          position: center,
-          offset: new window.T.Point(10, -20)
-        })
-        mapInstance.current.addOverLay(label)
-        markersRef.current.push(label)
-      } catch {}
+      const polygon = L.polygon(sectorPoints.map((p: any) => [p.lat, p.lng]), {
+        color: '#3b82f6', weight: 2, opacity: 0.8, fillColor: '#3b82f6', fillOpacity: 0.3
+      }).addTo(map)
+      layersRef.current.push(polygon)
     })
 
     if (cells.length > 0) {
-      const bounds = new window.T.LngLatBounds()
-      cells.forEach(c => bounds.extend(new window.T.LngLat(c.lng, c.lat)))
-      mapInstance.current.setViewport(bounds)
+      const bounds = L.latLngBounds(cells.map(c => [c.lat, c.lng]))
+      map.fitBounds(bounds, { padding: [30, 30] })
     }
   }, [cells])
 
   useEffect(() => {
-    if (mapLoaded && cells.length > 0) {
-      drawCells()
-    }
+    if (mapLoaded && cells.length > 0) drawCells()
   }, [cells, mapLoaded, drawCells])
 
   const calcSectorPoints = (lat: number, lng: number, azimuth: number, radiusKm: number) => {
@@ -457,6 +449,21 @@ export default function CellMapPage() {
           )}
         </div>
       </div>
+
+      <style jsx global>{`
+        .cell-label {
+          background: rgba(255,255,255,0.9) !important;
+          border: 1px solid #ccc !important;
+          border-radius: 4px !important;
+          padding: 2px 6px !important;
+          font-size: 11px !important;
+          font-weight: 600 !important;
+          color: #333 !important;
+          box-shadow: none !important;
+        }
+        .cell-label::before { border-top-color: #ccc !important; }
+        .leaflet-container { border-radius: 12px; }
+      `}</style>
     </div>
   )
 }
