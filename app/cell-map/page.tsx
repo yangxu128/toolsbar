@@ -106,22 +106,24 @@ export default function CellMapPage() {
       mapInstance.current.addOverLay(polygon)
       markersRef.current.push(polygon)
 
-      const label = new window.T.Label({
-        text: cell.name || `小区${idx + 1}`,
-        position: center,
-        offset: new window.T.Point(10, -20)
-      })
-      label.setStyle({
-        color: '#333',
-        fontSize: '11px',
-        fontWeight: 'bold',
-        background: 'rgba(255,255,255,0.8)',
-        border: '1px solid #ccc',
-        padding: '2px 6px',
-        borderRadius: '4px'
-      })
-      mapInstance.current.addOverLay(label)
-      markersRef.current.push(label)
+      if (window.T.Label) {
+        const label = new window.T.Label({
+          text: cell.name || `小区${idx + 1}`,
+          position: center,
+          offset: new window.T.Point(10, -20)
+        })
+        label.setStyle({
+          color: '#333',
+          fontSize: '11px',
+          fontWeight: 'bold',
+          background: 'rgba(255,255,255,0.8)',
+          border: '1px solid #ccc',
+          padding: '2px 6px',
+          borderRadius: '4px'
+        })
+        mapInstance.current.addOverLay(label)
+        markersRef.current.push(label)
+      }
     })
 
     if (cells.length > 0) {
