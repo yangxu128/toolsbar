@@ -6,7 +6,7 @@ import {
   Calculator, FileCode, BarChart3, Database, Settings2,
   ArrowRight, Wrench, FolderOpen, Star, ShieldCheck,
   Clock, Search, X, LayoutGrid, Code2, Palette, Radio,
-  GitMerge
+  GitMerge, MapPin
 } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 import { useSearchStore } from '@/lib/search-store'
@@ -150,6 +150,19 @@ const tools = [
     category: 'data',
     categoryLabel: '数据处理',
     available: false,
+  },
+  {
+    id: 'cell-map',
+    name: '基站小区地理化展示',
+    desc: '上传Excel文件，自动识别经纬度和方位角，在天地图上展示65°小区扇区',
+    icon: MapPin,
+    color: 'bg-green-600',
+    colorLight: 'bg-green-50 text-green-600',
+    path: '/cell-map',
+    tags: ['地图', 'GIS'],
+    category: 'visual',
+    categoryLabel: '数据可视化',
+    available: true,
   },
 ]
 
