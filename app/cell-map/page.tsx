@@ -64,7 +64,7 @@ export default function CellMapPage() {
     if (!mapRef.current || !tiandituKey || mapInstance.current) return
 
     const script = document.createElement('script')
-    script.src = `http://api.tianditu.gov.cn/api?v=4.0&tk=${tiandituKey}`
+    script.src = `https://api.tianditu.gov.cn/api?v=4.0&tk=${tiandituKey}`
     script.onload = () => {
       if (window.T && mapRef.current) {
         mapInstance.current = new window.T.Map(mapRef.current)
