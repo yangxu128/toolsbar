@@ -56,6 +56,18 @@ function calcSpeedThreshold(duplexMode: string, bandwidth: number): number | nul
   return null
 }
 
+function findCol(headers: string[], keywords: string[]): string | null {
+  for (const kw of keywords) {
+    const exact = headers.find(h => h === kw)
+    if (exact) return exact
+  }
+  for (const kw of keywords) {
+    const found = headers.find(h => h.includes(kw))
+    if (found) return found
+  }
+  return null
+}
+
 function findColIdx(headers: string[], keywords: string[]): number {
   for (const kw of keywords) {
     const idx = headers.findIndex(h => h.includes(kw))
@@ -64,30 +76,27 @@ function findColIdx(headers: string[], keywords: string[]): number {
   return -1
 }
 
-function findCol(headers: string[], keywords: string[]): string | null {
-  const idx = findColIdx(headers, keywords)
-  return idx >= 0 ? headers[idx] : null
-}
-
-const CELL_INFO_COLS = ['masterOperatorId', 'carrierBandwidth', 'aauChannel', 'duplexMode']
-
 function yieldToMain() {
   return new Promise(r => setTimeout(r, 0))
 }
 
-function readSheetCols(ws: XLSX.WorkSheet, colIndices: number[]): any[] {
-  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+function buildRows(rawRows: any[][], headers: string[], neededCols: string[]): any[] {
+  const colIndices = neededCols.map(name => headers.indexOf(name)).filter(i => i >= 0)
   const result: any[] = []
-  for (let R = range.s.r + 1; R <= range.e.r; R++) {
+  for (let i = 1; i < rawRows.length; i++) {
+    const row = rawRows[i]
     const obj: any = {}
     for (const ci of colIndices) {
-      const addr = XLSX.utils.encode_cell({ r: R, c: ci })
-      const cell = ws[addr]
-      obj[ci] = cell ? (cell.w !== undefined ? cell.w : cell.v) : ''
+      obj[headers[ci]] = row[ci] !== undefined && row[ci] !== null ? row[ci] : ''
     }
     result.push(obj)
   }
   return result
+}
+
+function toNum(v: any): number {
+  if (v === '' || v === null || v === undefined) return NaN
+  return Number(v)
 }
 
 export default function CellAnalysisPage() {
@@ -127,57 +136,66 @@ export default function CellAnalysisPage() {
       const qBuf = await qualityFile.arrayBuffer()
       const qWb = XLSX.read(qBuf, { type: 'array' })
       const qWs = qWb.Sheets[qWb.SheetNames[0]]
+      const qRaw: any[][] = XLSX.utils.sheet_to_json(qWs, { header: 1 })
+      const qHeaders: string[] = (qRaw[0] || []).map((h: any) => String(h || ''))
 
       addLog('读取高负荷指标文件...')
       await yieldToMain()
       const hBuf = await highloadFile.arrayBuffer()
       const hWb = XLSX.read(hBuf, { type: 'array' })
       const hWs = hWb.Sheets[hWb.SheetNames[0]]
+      const hRaw: any[][] = XLSX.utils.sheet_to_json(hWs, { header: 1 })
+      const hHeaders: string[] = (hRaw[0] || []).map((h: any) => String(h || ''))
 
-      // 读取表头
-      const qRawHeaders: any[] = XLSX.utils.sheet_to_json(qWs, { header: 1 }) as any
-      const qHeaders: string[] = (qRawHeaders[0] || []).map((h: any) => String(h || ''))
-      const hRawHeaders: any[] = XLSX.utils.sheet_to_json(hWs, { header: 1 }) as any
-      const hHeaders: string[] = (hRawHeaders[0] || []).map((h: any) => String(h || ''))
+      // 识别列名（与Python完全一致）
+      const colSubnet = findCol(qHeaders, ['子网名称']) || findCol(hHeaders, ['子网名称'])
+      const colMasterId = findCol(qHeaders, ['masterOperatorId']) || findCol(hHeaders, ['masterOperatorId'])
+      const colVoiceAccess = findCol(qHeaders, ['VONR语音建立请求次数_New_1652687181493', 'VONR语音建立请求次数', '语音建立请求次数', 'VoNR语音建立请求'])
+      const colVoiceRelease = findCol(qHeaders, ['VoNR语音释放总数_1652687182388', 'VoNR语音释放总数', '语音释放总数', 'VoNR语音释放'])
+      const colVoiceSetupSucc = findCol(qHeaders, ['VoNR语音建立成功率-55.10', 'VoNR语音建立成功率', '语音建立成功率'])
+      const colVoiceDropRate = findCol(qHeaders, ['VoNR语音掉线率-55.10', 'VoNR语音掉线率', '语音掉线率'])
+      const colVoiceHoSucc = findCol(qHeaders, ['VoNR语音系统内切换成功率', '语音切换成功率'])
+      const colVoicePdcpUpLoss = findCol(qHeaders, ['VoNR语音上行PDCP层丢包率', '语音上行PDCP丢包率', '上行PDCP层丢包率'])
+      const colVoicePdcpDnLoss = findCol(qHeaders, ['VoNR语音下行RLC层丢包率', '语音下行RLC丢包率', '下行RLC层丢包率'])
+      const col5gAccessCnt = findCol(qHeaders, ['维度汇总分接入类型RRC连接建立请求次数', 'RRC连接建立请求次数'])
+      const col5gReleaseCnt = findCol(qHeaders, ['UE上下文释放总次数'])
+      const col5gDnRlcTraffic = findCol(qHeaders, ['下行RLC层用户面流量(MBytes)', '下行RLC层用户面流量'])
+      const col5gBand = findCol(qHeaders, ['频段列表'])
+      const col5gAvgSpeed = findCol(qHeaders, ['5G用户下行平均感知速率-匠心(Mbps)', '5G用户下行平均感知速率', '下行平均感知速率'])
+      const col5gAccessSucc = findCol(qHeaders, ['无线接入成功率(%)', '无线接入成功率'])
+      const col5gUeDropRate = findCol(qHeaders, ['UE上下文掉线率(%)', 'UE上下文掉线率'])
 
-      // 识别列索引
-      const qiSubnet = findColIdx(qHeaders, ['子网名称'])
-      const qiMasterId = findColIdx(qHeaders, ['masterOperatorId'])
-      const qiVoiceAccess = findColIdx(qHeaders, ['VONR语音建立请求次数', '语音建立请求次数', 'VoNR语音建立请求'])
-      const qiVoiceRelease = findColIdx(qHeaders, ['VoNR语音释放总数', '语音释放总数', 'VoNR语音释放'])
-      const qiVoiceSetupSucc = findColIdx(qHeaders, ['VoNR语音建立成功率', '语音建立成功率'])
-      const qiVoiceDropRate = findColIdx(qHeaders, ['VoNR语音掉线率', '语音掉线率'])
-      const qiVoiceHoSucc = findColIdx(qHeaders, ['VoNR语音系统内切换成功率', '语音切换成功率'])
-      const qiVoicePdcpUpLoss = findColIdx(qHeaders, ['VoNR语音上行PDCP层丢包率', '语音上行PDCP丢包率', '上行PDCP层丢包率'])
-      const qiVoicePdcpDnLoss = findColIdx(qHeaders, ['VoNR语音下行RLC层丢包率', '语音下行RLC丢包率', '下行RLC层丢包率'])
-      const qi5gAccessCnt = findColIdx(qHeaders, ['维度汇总分接入类型RRC连接建立请求次数', 'RRC连接建立请求次数'])
-      const qi5gReleaseCnt = findColIdx(qHeaders, ['UE上下文释放总次数'])
-      const qi5gDnRlcTraffic = findColIdx(qHeaders, ['下行RLC层用户面流量(MBytes)', '下行RLC层用户面流量'])
-      const qi5gBand = findColIdx(qHeaders, ['频段列表'])
-      const qi5gAvgSpeed = findColIdx(qHeaders, ['5G用户下行平均感知速率', '下行平均感知速率'])
-      const qi5gAccessSucc = findColIdx(qHeaders, ['无线接入成功率(%)', '无线接入成功率'])
-      const qi5gUeDropRate = findColIdx(qHeaders, ['UE上下文掉线率(%)', 'UE上下文掉线率'])
+      const hColSubnet = findCol(hHeaders, ['子网名称'])
+      const hColMasterId = findCol(hHeaders, ['masterOperatorId'])
+      const colPrbUtil = findCol(hHeaders, ['下行PRB平均占用率'])
+      const colDnTraffic = findCol(hHeaders, ['下行RLC层用户面流量(MBytes)', '下行RLC层用户面流量'])
+      const colRrcUsers = findCol(hHeaders, ['RRC连接平均连接用户数'])
+      const colBand = findCol(hHeaders, ['频段列表'])
 
-      const hiSubnet = findColIdx(hHeaders, ['子网名称'])
-      const hiMasterId = findColIdx(hHeaders, ['masterOperatorId'])
-      const hiPrbUtil = findColIdx(hHeaders, ['下行PRB平均占用率'])
-      const hiDnTraffic = findColIdx(hHeaders, ['下行RLC层用户面流量(MBytes)', '下行RLC层用户面流量'])
-      const hiRrcUsers = findColIdx(hHeaders, ['RRC连接平均连接用户数'])
-      const hiBand = findColIdx(hHeaders, ['频段列表'])
+      addLog('列名自动识别完成')
+      addLog(`语音接入次数: ${colVoiceAccess || '未找到'}`)
+      addLog(`语音释放次数: ${colVoiceRelease || '未找到'}`)
+      addLog(`语音建立成功率: ${colVoiceSetupSucc || '未找到'}`)
+      addLog(`语音掉线率: ${colVoiceDropRate || '未找到'}`)
+      addLog(`语音切换成功率: ${colVoiceHoSucc || '未找到'}`)
+      addLog(`5G接入次数: ${col5gAccessCnt || '未找到'}`)
+      addLog(`5G释放次数: ${col5gReleaseCnt || '未找到'}`)
+      addLog(`5G速率: ${col5gAvgSpeed || '未找到'}`)
+      addLog(`5G接入成功率: ${col5gAccessSucc || '未找到'}`)
+      addLog(`5G掉线率: ${col5gUeDropRate || '未找到'}`)
+      addLog(`PRB占用率: ${colPrbUtil || '未找到'}`)
 
-      addLog('列名自动识别完成，只提取需要的列...')
+      // 只提取需要的列，减少内存
+      const qNeededCols = [colSubnet, colMasterId, colVoiceAccess, colVoiceRelease, colVoiceSetupSucc, colVoiceDropRate, colVoiceHoSucc, colVoicePdcpUpLoss, colVoicePdcpDnLoss, col5gAccessCnt, col5gReleaseCnt, col5gDnRlcTraffic, col5gBand, col5gAvgSpeed, col5gAccessSucc, col5gUeDropRate].filter((c): c is string => c !== null)
+      const hNeededCols = [hColSubnet, hColMasterId, colPrbUtil, colDnTraffic, colRrcUsers, colBand].filter((c): c is string => c !== null)
 
-      // 只提取需要的列
-      const qNeededIdx = [qiSubnet, qiMasterId, qiVoiceAccess, qiVoiceRelease, qiVoiceSetupSucc, qiVoiceDropRate, qiVoiceHoSucc, qiVoicePdcpUpLoss, qiVoicePdcpDnLoss, qi5gAccessCnt, qi5gReleaseCnt, qi5gDnRlcTraffic, qi5gBand, qi5gAvgSpeed, qi5gAccessSucc, qi5gUeDropRate].filter(i => i >= 0)
-      const hNeededIdx = [hiSubnet, hiMasterId, hiPrbUtil, hiDnTraffic, hiRrcUsers, hiBand].filter(i => i >= 0)
-
-      const dfQuality = readSheetCols(qWs, qNeededIdx)
+      const dfQuality = buildRows(qRaw, qHeaders, qNeededCols)
       await yieldToMain()
-      addLog(`质差文件：${dfQuality.length}行，${qNeededIdx.length}列`)
+      addLog(`质差文件：${dfQuality.length}行，${qNeededCols.length}列`)
 
-      const dfHighload = readSheetCols(hWs, hNeededIdx)
+      const dfHighload = buildRows(hRaw, hHeaders, hNeededCols)
       await yieldToMain()
-      addLog(`高负荷文件：${dfHighload.length}行，${hNeededIdx.length}列`)
+      addLog(`高负荷文件：${dfHighload.length}行，${hNeededCols.length}列`)
 
       // 小区基础信息
       let cellInfoMap = new Map<string, any>()
@@ -187,53 +205,45 @@ export default function CellAnalysisPage() {
         const cBuf = await cellInfoFile.arrayBuffer()
         const cWb = XLSX.read(cBuf, { type: 'array' })
         const cWs = cWb.Sheets[cWb.SheetNames[0]]
-        const rawRows: any[][] = XLSX.utils.sheet_to_json(cWs, { header: 1 })
-        if (rawRows.length > 0) {
-          const cHeaders = rawRows[0].map((h: any) => String(h || ''))
-          const ciMasterId = findColIdx(cHeaders, ['masterOperatorId'])
-          const ciBw = findColIdx(cHeaders, ['carrierBandwidth'])
-          const ciAau = findColIdx(cHeaders, ['aauChannel'])
-          const ciDuplex = findColIdx(cHeaders, ['duplexMode'])
-          for (let i = 1; i < rawRows.length; i++) {
-            const row = rawRows[i]
-            const k = ciMasterId >= 0 ? String(row[ciMasterId] || '') : ''
-            if (k && !cellInfoMap.has(k)) {
-              const obj: any = {}
-              if (ciBw >= 0) obj['carrierBandwidth'] = row[ciBw]
-              if (ciAau >= 0) obj['aauChannel'] = row[ciAau]
-              if (ciDuplex >= 0) obj['duplexMode'] = row[ciDuplex]
-              cellInfoMap.set(k, obj)
-            }
+        const cRaw: any[][] = XLSX.utils.sheet_to_json(cWs, { header: 1 })
+        if (cRaw.length > 0) {
+          const cHeaders = cRaw[0].map((h: any) => String(h || ''))
+          const ciMid = findCol(cHeaders, ['masterOperatorId'])
+          const ciBw = findCol(cHeaders, ['carrierBandwidth'])
+          const ciAau = findCol(cHeaders, ['aauChannel'])
+          const ciDuplex = findCol(cHeaders, ['duplexMode'])
+          const cNeeded = [ciMid, ciBw, ciAau, ciDuplex].filter((c): c is string => c !== null)
+          const cData = buildRows(cRaw, cHeaders, cNeeded)
+          for (const r of cData) {
+            const k = String(r[ciMid!] || '')
+            if (k && !cellInfoMap.has(k)) cellInfoMap.set(k, r)
           }
         }
         addLog(`小区基础信息：${cellInfoMap.size}条`)
         await yieldToMain()
       }
 
-      // 关联基础信息
-      const masterIdIdx = qiMasterId >= 0 ? qiMasterId : hiMasterId
-      if (cellInfoMap.size > 0 && masterIdIdx >= 0) {
+      // 关联基础信息（与Python merge一致）
+      if (cellInfoMap.size > 0 && colMasterId) {
         for (const r of dfQuality) {
-          const info = cellInfoMap.get(String(r[masterIdIdx]))
+          const info = cellInfoMap.get(String(r[colMasterId]))
           if (info) { r['carrierBandwidth'] = info['carrierBandwidth']; r['aauChannel'] = info['aauChannel']; r['duplexMode'] = info['duplexMode'] }
         }
         for (const r of dfHighload) {
-          const info = cellInfoMap.get(String(r[masterIdIdx]))
+          const info = cellInfoMap.get(String(r[hColMasterId || colMasterId]))
           if (info) { r['carrierBandwidth'] = info['carrierBandwidth']; r['aauChannel'] = info['aauChannel']; r['duplexMode'] = info['duplexMode'] }
         }
         addLog('已关联小区基础信息')
         await yieldToMain()
       }
 
-      const getVal = (r: any, idx: number) => idx >= 0 ? Number(r[idx]) || 0 : 0
-      const getStr = (r: any, idx: number) => idx >= 0 ? String(r[idx] || '') : ''
-      const subnetIdx = qiSubnet >= 0 ? qiSubnet : hiSubnet
-      const getCity = (r: any) => subnetIdx >= 0 ? getStr(r, subnetIdx).substring(0, 2) || '未知' : '未知'
+      const N = (v: any) => { const n = toNum(v); return isNaN(n) ? 0 : n }
+      const getCity = (r: any, col: string | null) => col ? String(r[col] || '未知').substring(0, 2) || '未知' : '未知'
 
       // ============ 一、语音质差 ============
       addLog('开始语音质差分析...')
       await yieldToMain()
-      const hasVoiceCols = qiVoiceSetupSucc >= 0 && qiVoiceDropRate >= 0 && qiVoiceHoSucc >= 0 && qiVoicePdcpUpLoss >= 0 && qiVoicePdcpDnLoss >= 0
+      const hasVoiceCols = colVoiceSetupSucc && colVoiceDropRate && colVoiceHoSucc && colVoicePdcpUpLoss && colVoicePdcpDnLoss
 
       let voiceBadRows: any[] = []
       let voiceStats = { total: 0, lowSetup: 0, highDrop: 0, lowHo: 0, highLoss: 0, bad: 0 }
@@ -242,16 +252,22 @@ export default function CellAnalysisPage() {
       if (hasVoiceCols) {
         for (let i = 0; i < dfQuality.length; i++) {
           const r = dfQuality[i]
-          const ac = getVal(r, qiVoiceAccess)
-          const rc = getVal(r, qiVoiceRelease)
+          const ac = colVoiceAccess ? N(r[colVoiceAccess]) : 0
+          const rc = colVoiceRelease ? N(r[colVoiceRelease]) : 0
           if (ac < voiceTh.accessCnt || rc < voiceTh.releaseCnt) continue
           voiceStats.total++
 
-          const city = getCity(r)
-          const lowSetup = getVal(r, qiVoiceSetupSucc) < voiceTh.setupSucc
-          const highDrop = getVal(r, qiVoiceDropRate) > voiceTh.dropRate
-          const lowHo = getVal(r, qiVoiceHoSucc) < voiceTh.hoSucc
-          const highLoss = getVal(r, qiVoicePdcpUpLoss) > voiceTh.loss || getVal(r, qiVoicePdcpDnLoss) > voiceTh.loss
+          const city = getCity(r, colSubnet)
+          const setupSucc = toNum(r[colVoiceSetupSucc!])
+          const dropRate = toNum(r[colVoiceDropRate!])
+          const hoSucc = toNum(r[colVoiceHoSucc!])
+          const pdcpUpLoss = toNum(r[colVoicePdcpUpLoss!])
+          const pdcpDnLoss = toNum(r[colVoicePdcpDnLoss!])
+
+          const lowSetup = !isNaN(setupSucc) && setupSucc < voiceTh.setupSucc
+          const highDrop = !isNaN(dropRate) && dropRate > voiceTh.dropRate
+          const lowHo = !isNaN(hoSucc) && hoSucc < voiceTh.hoSucc
+          const highLoss = (!isNaN(pdcpUpLoss) && pdcpUpLoss > voiceTh.loss) || (!isNaN(pdcpDnLoss) && pdcpDnLoss > voiceTh.loss)
           const isBad = lowSetup || highDrop || lowHo || highLoss
 
           if (lowSetup) voiceStats.lowSetup++
@@ -260,8 +276,7 @@ export default function CellAnalysisPage() {
           if (highLoss) voiceStats.highLoss++
           if (isBad) {
             voiceStats.bad++
-            const out: any = {}
-            for (const ci of qNeededIdx) out[qHeaders[ci]] = r[ci]
+            const out: any = { ...r }
             out['语音-低接通'] = lowSetup; out['语音-高掉线'] = highDrop; out['语音-低切换'] = lowHo; out['语音-高丢包'] = highLoss; out['语音-质差小区'] = isBad
             voiceBadRows.push(out)
           }
@@ -285,21 +300,25 @@ export default function CellAnalysisPage() {
 
       for (let i = 0; i < dfQuality.length; i++) {
         const r = dfQuality[i]
-        const ac = getVal(r, qi5gAccessCnt)
-        const rc = getVal(r, qi5gReleaseCnt)
-        const tf = getVal(r, qi5gDnRlcTraffic)
-        const bd = qi5gBand >= 0 ? Number(r[qi5gBand]) || 0 : 0
-        if (ac < g5Th.accessCnt || rc < g5Th.releaseCnt || tf <= g5Th.dnRlcTraffic || !g5Th.bands.includes(bd)) continue
+        const ac = col5gAccessCnt ? N(r[col5gAccessCnt]) : 0
+        const rc = col5gReleaseCnt ? N(r[col5gReleaseCnt]) : 0
+        const tf = col5gDnRlcTraffic ? N(r[col5gDnRlcTraffic]) : 0
+        const bd = col5gBand ? r[col5gBand] : null
+        const bdNum = toNum(bd)
+        const bandMatch = !isNaN(bdNum) ? g5Th.bands.includes(bdNum) : (bd !== null && bd !== '' && g5Th.bands.some(b => String(bd).includes(String(b))))
+        if (ac < g5Th.accessCnt || rc < g5Th.releaseCnt || tf <= g5Th.dnRlcTraffic || !bandMatch) continue
         g5Stats.total++
 
-        const city = getCity(r)
-        const avgSpeed = getVal(r, qi5gAvgSpeed)
+        const city = getCity(r, colSubnet)
+        const avgSpeed = col5gAvgSpeed ? toNum(r[col5gAvgSpeed]) : NaN
         const duplexMode = String(r['duplexMode'] || '')
-        const bandwidth = Number(r['carrierBandwidth']) || 0
+        const bandwidth = N(r['carrierBandwidth'])
         const threshold = calcSpeedThreshold(duplexMode, bandwidth)
-        const lowSpeed = threshold !== null && avgSpeed < threshold
-        const lowAccess = qi5gAccessSucc >= 0 ? getVal(r, qi5gAccessSucc) < g5Th.accessSucc : false
-        const highDrop = qi5gUeDropRate >= 0 ? getVal(r, qi5gUeDropRate) > g5Th.ueDropRate : false
+        const lowSpeed = !isNaN(avgSpeed) && threshold !== null && avgSpeed < threshold
+        const accessSucc = col5gAccessSucc ? toNum(r[col5gAccessSucc]) : NaN
+        const ueDropRate = col5gUeDropRate ? toNum(r[col5gUeDropRate]) : NaN
+        const lowAccess = !isNaN(accessSucc) && accessSucc < g5Th.accessSucc
+        const highDrop = !isNaN(ueDropRate) && ueDropRate > g5Th.ueDropRate
         const isBad = lowSpeed || lowAccess || highDrop
 
         if (lowSpeed) g5Stats.lowSpeed++
@@ -307,8 +326,7 @@ export default function CellAnalysisPage() {
         if (highDrop) g5Stats.highDrop++
         if (isBad) {
           g5Stats.bad++
-          const out: any = {}
-          for (const ci of qNeededIdx) out[qHeaders[ci]] = r[ci]
+          const out: any = { ...r }
           out['速率门限(Mbps)'] = threshold; out['5G-低速率'] = lowSpeed; out['5G-低接入'] = lowAccess; out['5G-高掉线'] = highDrop; out['5G-质差小区'] = isBad
           g5BadRows.push(out)
         }
@@ -329,22 +347,23 @@ export default function CellAnalysisPage() {
       let highLoadStats = { total: dfHighload.length, bad: 0 }
       let highLoadBadRows: any[] = []
       const hlCityMap = new Map<string, { total: number, bad: number }>()
+      const hlSubnet = hColSubnet || colSubnet
 
       for (let i = 0; i < dfHighload.length; i++) {
         const r = dfHighload[i]
-        const city = getCity(r)
-        const prb = getVal(r, hiPrbUtil)
+        const city = getCity(r, hlSubnet)
+        const prb = colPrbUtil ? toNum(r[colPrbUtil]) : NaN
         if (isNaN(prb) || prb <= highLoadTh.prbUtil) {
           if (!hlCityMap.has(city)) hlCityMap.set(city, { total: 0, bad: 0 })
           hlCityMap.get(city)!.total++
           continue
         }
 
-        const band = hiBand >= 0 ? Number(r[hiBand]) || 0 : 0
+        const band = colBand ? N(r[colBand]) : 0
         const aau = String(r['aauChannel'] || '')
-        const bw = Number(r['carrierBandwidth']) || 0
-        const trafficGb = getVal(r, hiDnTraffic) / 1024
-        const rrcUsers = getVal(r, hiRrcUsers)
+        const bw = N(r['carrierBandwidth'])
+        const trafficGb = colDnTraffic ? N(r[colDnTraffic]) / 1024 : 0
+        const rrcUsers = colRrcUsers ? N(r[colRrcUsers]) : 0
 
         let thresholdDict: Record<string, [number, number]> | null = null
         let category = ''
@@ -364,8 +383,7 @@ export default function CellAnalysisPage() {
         hlCityMap.get(city)!.total++
         if (isHighLoad) {
           highLoadStats.bad++
-          const out: any = {}
-          for (const ci of hNeededIdx) out[hHeaders[ci]] = r[ci]
+          const out: any = { ...r }
           out['高负荷小区'] = true; out['高负荷类型'] = category
           highLoadBadRows.push(out)
           hlCityMap.get(city)!.bad++
