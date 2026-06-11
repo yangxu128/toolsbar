@@ -6,7 +6,7 @@ import {
   Calculator, FileCode, BarChart3, Database, Settings2,
   ArrowRight, Wrench, FolderOpen, Star, ShieldCheck,
   Clock, Search, X, LayoutGrid, Code2, Palette, Radio,
-  GitMerge, MapPin
+  GitMerge, MapPin, AlertTriangle
 } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 import { useSearchStore } from '@/lib/search-store'
@@ -162,6 +162,19 @@ const tools = [
     tags: ['地图', 'GIS'],
     category: 'visual',
     categoryLabel: '数据可视化',
+    available: true,
+  },
+  {
+    id: 'cell-analysis',
+    name: '质差小区指标计算',
+    desc: '语音质差+5G通用质差+高负荷小区综合分析，自动识别列名，支持阈值配置',
+    icon: AlertTriangle,
+    color: 'bg-amber-500',
+    colorLight: 'bg-amber-50 text-amber-600',
+    path: '/cell-analysis',
+    tags: ['质差', '高负荷'],
+    category: 'data',
+    categoryLabel: '数据处理',
     available: true,
   },
 ]
