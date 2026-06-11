@@ -1,0 +1,222 @@
+'use client'
+
+import { useState, useCallback, useMemo } from 'react'
+import Link from 'next/link'
+import { Search, Home, Star, ChevronRight as ChevronRightIcon, Copy, Check } from 'lucide-react'
+import { useFavStore } from '@/lib/fav-store'
+
+const presets = [
+  { name: '邮箱', pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/ },
+  { name: '手机号', pattern: /^1[3-9]\d{9}$/ },
+  { name: 'URL', pattern: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)$/ },
+  { name: 'IP地址', pattern: /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/ },
+  { name: '日期(YYYY-MM-DD)', pattern: /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/ },
+  { name: '中文字符', pattern: /^[\u4e00-\u9fa5]+$/ },
+  { name: '身份证', pattern: /^\d{17}[\dXx]$/ },
+  { name: '邮编', pattern: /^[1-9]\d{5}$/ },
+]
+
+export default function RegexTesterPage() {
+  const isFav = useFavStore(s => s.isFav)
+  const toggleFav = useFavStore(s => s.toggleFav)
+  const fav = isFav('regex-tester')
+
+  const [pattern, setPattern] = useState('')
+  const [flags, setFlags] = useState('g')
+  const [testStr, setTestStr] = useState('')
+  const [replaceStr, setReplaceStr] = useState('')
+  const [mode, setMode] = useState<'match' | 'replace' | 'split'>('match')
+  const [copied, setCopied] = useState(false)
+
+  const regex = useMemo(() => {
+    if (!pattern) return null
+    try { return new RegExp(pattern, flags) } catch { return null }
+  }, [pattern, flags])
+
+  const matches = useMemo(() => {
+    if (!regex || !testStr) return []
+    const results: { match: string; index: number; groups?: Record<string, string> }[] = []
+    if (flags.includes('g')) {
+      let m
+      while ((m = regex.exec(testStr)) !== null) {
+        results.push({ match: m[0], index: m.index, groups: m.groups })
+        if (!m[0]) regex.lastIndex++
+      }
+    } else {
+      const m = regex.exec(testStr)
+      if (m) results.push({ match: m[0], index: m.index, groups: m.groups })
+    }
+    return results
+  }, [regex, testStr, flags])
+
+  const result = useMemo(() => {
+    if (!regex || !testStr) return ''
+    if (mode === 'replace') return testStr.replace(regex, replaceStr)
+    if (mode === 'split') return testStr.split(regex).join(' | ')
+    return ''
+  }, [regex, testStr, mode, replaceStr])
+
+  const highlighted = useMemo(() => {
+    if (!regex || !testStr || matches.length === 0) return testStr
+    const parts: { text: string; isMatch: boolean }[] = []
+    let lastIdx = 0
+    for (const m of matches) {
+      if (m.index > lastIdx) parts.push({ text: testStr.slice(lastIdx, m.index), isMatch: false })
+      parts.push({ text: m.match, isMatch: true })
+      lastIdx = m.index + m.match.length
+    }
+    if (lastIdx < testStr.length) parts.push({ text: testStr.slice(lastIdx), isMatch: false })
+    return parts
+  }, [regex, testStr, matches])
+
+  const toggleFlag = useCallback((f: string) => {
+    setFlags(prev => prev.includes(f) ? prev.replace(f, '') : prev + f)
+  }, [])
+
+  const copyResult = useCallback(() => {
+    const text = mode === 'match' ? matches.map(m => m.match).join('\n') : result
+    if (!text) return
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }, [mode, matches, result])
+
+  return (
+    <div>
+      <nav className="flex items-center gap-2 text-sm mb-6 text-[hsl(var(--muted-foreground))]">
+        <Link href="/" className="hover:text-[hsl(var(--primary))] transition-colors flex items-center gap-1"><Home className="w-4 h-4" />首页</Link>
+        <ChevronRightIcon className="w-4 h-4" /><span>开发工具</span>
+        <ChevronRightIcon className="w-4 h-4" /><span className="text-[hsl(var(--foreground))] font-medium">正则测试工具</span>
+      </nav>
+
+      <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm">
+        <div className="p-6 sm:p-8 border-b border-[hsl(var(--border))]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-cyan-500 flex items-center justify-center shrink-0"><Search className="w-6 h-6 text-white" /></div>
+              <div>
+                <h2 className="text-2xl font-bold text-[hsl(var(--foreground))]">正则测试工具</h2>
+                <p className="text-[hsl(var(--muted-foreground))] mt-1">实时正则表达式匹配测试，支持替换与分割</p>
+              </div>
+            </div>
+            <button onClick={() => toggleFav('regex-tester')} className={`icon-btn shrink-0 ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}><Star className={`w-5 h-5 ${fav ? 'fill-current' : ''}`} /></button>
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-8">
+          {/* 正则输入 */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-cyan-500 font-mono text-lg">/</span>
+            <input type="text" value={pattern} onChange={e => setPattern(e.target.value)} placeholder="输入正则表达式..."
+              className="flex-1 px-3 py-2 rounded-lg border border-[hsl(var(--border))] text-sm font-mono bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] outline-none focus:border-cyan-500" />
+            <span className="text-cyan-500 font-mono text-lg">/</span>
+            <input type="text" value={flags} onChange={e => setFlags(e.target.value)} placeholder="flags"
+              className="w-16 px-2 py-2 rounded-lg border border-[hsl(var(--border))] text-sm font-mono bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] outline-none focus:border-cyan-500 text-center" />
+          </div>
+
+          {/* 标志位 */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {[['g', '全局'], ['i', '忽略大小写'], ['m', '多行'], ['s', '单行']].map(([f, label]) => (
+              <button key={f} onClick={() => toggleFlag(f)}
+                className={`px-2 py-1 rounded text-[10px] font-medium ${flags.includes(f) ? 'bg-cyan-500 text-white' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+                {f} - {label}
+              </button>
+            ))}
+          </div>
+
+          {/* 预设 */}
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {presets.map(p => (
+              <button key={p.name} onClick={() => { setPattern(p.pattern.source); setFlags('g') }}
+                className="px-2 py-1 rounded-md bg-[hsl(var(--muted))] text-[10px] text-[hsl(var(--muted-foreground))] hover:bg-cyan-100 dark:hover:bg-cyan-900/30 hover:text-cyan-600 transition-colors">
+                {p.name}
+              </button>
+            ))}
+          </div>
+
+          {/* 模式 */}
+          <div className="flex items-center gap-2 mb-4">
+            {(['match', 'replace', 'split'] as const).map(m => (
+              <button key={m} onClick={() => setMode(m)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mode === m ? 'bg-cyan-500 text-white' : 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]'}`}>
+                {{ match: '匹配', replace: '替换', split: '分割' }[m]}
+              </button>
+            ))}
+          </div>
+
+          {/* 测试文本 */}
+          <div className="mb-4">
+            <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">测试文本</label>
+            <textarea value={testStr} onChange={e => setTestStr(e.target.value)} placeholder="输入要测试的文本..."
+              className="w-full h-32 p-3 rounded-xl border border-[hsl(var(--border))] text-sm font-mono bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] resize-none outline-none focus:border-cyan-500" />
+          </div>
+
+          {/* 高亮匹配 */}
+          {testStr && regex && (
+            <div className="mb-4 p-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+              <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">匹配高亮</label>
+              <div className="text-sm font-mono break-all leading-relaxed">
+                {typeof highlighted === 'string' ? highlighted : (highlighted as { text: string; isMatch: boolean }[]).map((part, i) =>
+                  part.isMatch
+                    ? <mark key={i} className="bg-cyan-200 dark:bg-cyan-800 text-[hsl(var(--foreground))] rounded px-0.5">{part.text}</mark>
+                    : <span key={i}>{part.text}</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 替换输入 */}
+          {mode === 'replace' && (
+            <div className="mb-4">
+              <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">替换为</label>
+              <input type="text" value={replaceStr} onChange={e => setReplaceStr(e.target.value)} placeholder="替换字符串（支持$1,$2...）"
+                className="w-full px-3 py-2 rounded-lg border border-[hsl(var(--border))] text-sm font-mono bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] outline-none focus:border-cyan-500" />
+            </div>
+          )}
+
+          {/* 结果 */}
+          {(matches.length > 0 || result) && (
+            <div className="mb-4 p-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                  {mode === 'match' ? `匹配结果 (${matches.length}个)` : '处理结果'}
+                </label>
+                <button onClick={copyResult} className="text-xs text-[hsl(var(--muted-foreground))] hover:text-cyan-500 flex items-center gap-1">
+                  {copied ? <><Check className="w-3 h-3" />已复制</> : <><Copy className="w-3 h-3" />复制</>}
+                </button>
+              </div>
+              {mode === 'match' ? (
+                <div className="space-y-1">
+                  {matches.map((m, i) => (
+                    <div key={i} className="text-xs font-mono flex items-center gap-2">
+                      <span className="text-[hsl(var(--muted-foreground))]">[{m.index}]</span>
+                      <span className="text-cyan-600 dark:text-cyan-400">{m.match}</span>
+                      {m.groups && <span className="text-[hsl(var(--muted-foreground))]">{JSON.stringify(m.groups)}</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm font-mono break-all text-[hsl(var(--foreground))]">{result}</div>
+              )}
+            </div>
+          )}
+
+          {/* 正则错误 */}
+          {pattern && !regex && (
+            <div className="mb-4 p-3 rounded-xl border border-red-300 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 text-xs">
+              正则表达式语法错误
+            </div>
+          )}
+
+          <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-[11px] text-[hsl(var(--muted-foreground))] space-y-1">
+            <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
+            <p>• 输入正则表达式和测试文本，实时显示匹配结果</p>
+            <p>• 支持匹配、替换、分割三种模式</p>
+            <p>• 点击预设快速填入常用正则</p>
+            <p>• 替换模式支持 $1, $2 等捕获组引用</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
