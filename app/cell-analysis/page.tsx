@@ -182,7 +182,7 @@ export default function CellAnalysisPage() {
       // 小区基础信息
       let cellInfoMap = new Map<string, any>()
       if (cellInfoFile) {
-        addLog('读取小区基础信息CSV...')
+        addLog('读取小区基础信息...')
         await yieldToMain()
         const cBuf = await cellInfoFile.arrayBuffer()
         const cWb = XLSX.read(cBuf, { type: 'array' })
@@ -528,7 +528,7 @@ export default function CellAnalysisPage() {
               <h3 className="text-sm font-semibold text-[hsl(var(--foreground))]">上传数据文件</h3>
               <FileUpload label="质差类指标文件（Excel）" file={qualityFile} setFile={setQualityFile} accept=".xlsx,.xls" required />
               <FileUpload label="高负荷指标文件（Excel）" file={highloadFile} setFile={setHighloadFile} accept=".xlsx,.xls" required />
-              <FileUpload label="小区基础信息（CSV，可选）" file={cellInfoFile} setFile={setCellInfoFile} accept=".csv" />
+              <FileUpload label="小区基础信息（Excel，可选）" file={cellInfoFile} setFile={setCellInfoFile} accept=".xlsx,.xls" />
             </div>
 
             {/* 阈值设置 */}
@@ -664,7 +664,7 @@ export default function CellAnalysisPage() {
                 <p>• 质差类指标文件（Excel）：包含VoNR语音指标和5G通用指标，粒度为自定义全时间</p>
                 <p>• 高负荷指标文件（Excel）：包含PRB占用率、流量、用户数等指标，粒度为1小时</p>
                 <p><strong className="text-[hsl(var(--foreground))]">可选文件：</strong></p>
-                <p>• 小区基础信息（CSV）：包含masterOperatorId、carrierBandwidth、aauChannel、duplexMode字段</p>
+                <p>• 小区基础信息（Excel）：包含masterOperatorId、carrierBandwidth、aauChannel、duplexMode字段</p>
                 <p><strong className="text-[hsl(var(--foreground))]">自动识别列名：</strong>系统会自动匹配包含关键字的列名，无需手动指定</p>
                 <p><strong className="text-[hsl(var(--foreground))]">输出内容：</strong></p>
                 <p>• 语音质差小区详细（低接通/高掉线/低切换/高丢包）</p>
