@@ -19,6 +19,14 @@ export interface NrBand {
   arfcnStart: number
   arfcnEnd: number
   deltaF: number
+  dlLow?: number
+  dlHigh?: number
+  dlArfcnStart?: number
+  dlArfcnEnd?: number
+  ulLow?: number
+  ulHigh?: number
+  ulArfcnStart?: number
+  ulArfcnEnd?: number
 }
 
 export const LTE_BANDS: LteBand[] = [
@@ -46,14 +54,14 @@ export const LTE_BANDS: LteBand[] = [
 ]
 
 export const NR_BANDS: NrBand[] = [
-  { band: 'n1', mode: 'FDD', low: 1920, high: 1980, arfcnStart: 384000, arfcnEnd: 396000, deltaF: 5 },
-  { band: 'n2', mode: 'FDD', low: 1850, high: 1910, arfcnStart: 386000, arfcnEnd: 392000, deltaF: 5 },
-  { band: 'n3', mode: 'FDD', low: 1710, high: 1785, arfcnStart: 342000, arfcnEnd: 357000, deltaF: 5 },
-  { band: 'n5', mode: 'FDD', low: 824, high: 849, arfcnStart: 164800, arfcnEnd: 169800, deltaF: 5 },
-  { band: 'n7', mode: 'FDD', low: 2500, high: 2570, arfcnStart: 500000, arfcnEnd: 514000, deltaF: 5 },
-  { band: 'n8', mode: 'FDD', low: 880, high: 915, arfcnStart: 176000, arfcnEnd: 183000, deltaF: 5 },
-  { band: 'n20', mode: 'FDD', low: 832, high: 862, arfcnStart: 166400, arfcnEnd: 172400, deltaF: 5 },
-  { band: 'n28', mode: 'FDD', low: 703, high: 748, arfcnStart: 140600, arfcnEnd: 149600, deltaF: 5 },
+  { band: 'n1', mode: 'FDD', low: 1920, high: 2170, arfcnStart: 384000, arfcnEnd: 396000, deltaF: 5, dlLow: 2110, dlHigh: 2170, dlArfcnStart: 422000, dlArfcnEnd: 434000, ulLow: 1920, ulHigh: 1980, ulArfcnStart: 384000, ulArfcnEnd: 396000 },
+  { band: 'n2', mode: 'FDD', low: 1850, high: 1990, arfcnStart: 386000, arfcnEnd: 398000, deltaF: 5, dlLow: 1930, dlHigh: 1990, dlArfcnStart: 386000, dlArfcnEnd: 398000, ulLow: 1850, ulHigh: 1910, ulArfcnStart: 370000, ulArfcnEnd: 382000 },
+  { band: 'n3', mode: 'FDD', low: 1710, high: 1880, arfcnStart: 342000, arfcnEnd: 376000, deltaF: 5, dlLow: 1805, dlHigh: 1880, dlArfcnStart: 361000, dlArfcnEnd: 376000, ulLow: 1710, ulHigh: 1785, ulArfcnStart: 342000, ulArfcnEnd: 357000 },
+  { band: 'n5', mode: 'FDD', low: 824, high: 894, arfcnStart: 164800, arfcnEnd: 178800, deltaF: 5, dlLow: 869, dlHigh: 894, dlArfcnStart: 173800, dlArfcnEnd: 178800, ulLow: 824, ulHigh: 849, ulArfcnStart: 164800, ulArfcnEnd: 169800 },
+  { band: 'n7', mode: 'FDD', low: 2500, high: 2690, arfcnStart: 500000, arfcnEnd: 538000, deltaF: 5, dlLow: 2620, dlHigh: 2690, dlArfcnStart: 524000, dlArfcnEnd: 538000, ulLow: 2500, ulHigh: 2570, ulArfcnStart: 500000, ulArfcnEnd: 514000 },
+  { band: 'n8', mode: 'FDD', low: 880, high: 960, arfcnStart: 176000, arfcnEnd: 192000, deltaF: 5, dlLow: 925, dlHigh: 960, dlArfcnStart: 185000, dlArfcnEnd: 192000, ulLow: 880, ulHigh: 915, ulArfcnStart: 176000, ulArfcnEnd: 183000 },
+  { band: 'n20', mode: 'FDD', low: 832, high: 862, arfcnStart: 166400, arfcnEnd: 172400, deltaF: 5, dlLow: 791, dlHigh: 821, dlArfcnStart: 158200, dlArfcnEnd: 164200, ulLow: 832, ulHigh: 862, ulArfcnStart: 166400, ulArfcnEnd: 172400 },
+  { band: 'n28', mode: 'FDD', low: 703, high: 803, arfcnStart: 140600, arfcnEnd: 160600, deltaF: 5, dlLow: 758, dlHigh: 803, dlArfcnStart: 151600, dlArfcnEnd: 160600, ulLow: 703, ulHigh: 748, ulArfcnStart: 140600, ulArfcnEnd: 149600 },
   { band: 'n41', mode: 'TDD', low: 2496, high: 2690, arfcnStart: 499200, arfcnEnd: 537999, deltaF: 15 },
   { band: 'n77', mode: 'TDD', low: 3300, high: 4200, arfcnStart: 620000, arfcnEnd: 680000, deltaF: 15 },
   { band: 'n78', mode: 'TDD', low: 3300, high: 3800, arfcnStart: 620000, arfcnEnd: 653333, deltaF: 15 },
@@ -105,13 +113,30 @@ export function calcNrFreq(nref: number) {
   const range = getNrRange(nref)
   if (!range) return null
   const freq = range.fOffs + (range.deltaF / 1000) * (nref - range.nOffs)
-  const matchedBand = NR_BANDS.find(b => nref >= b.arfcnStart && nref <= b.arfcnEnd) || null
-  return { freq, range, matchedBand }
+  let matchedBand: NrBand | null = null
+  let dir: 'dl' | 'ul' | null = null
+  for (const b of NR_BANDS) {
+    if (b.mode === 'FDD') {
+      if (b.dlArfcnStart !== undefined && b.dlArfcnEnd !== undefined && nref >= b.dlArfcnStart && nref <= b.dlArfcnEnd) { matchedBand = b; dir = 'dl'; break }
+      if (b.ulArfcnStart !== undefined && b.ulArfcnEnd !== undefined && nref >= b.ulArfcnStart && nref <= b.ulArfcnEnd) { matchedBand = b; dir = 'ul'; break }
+    } else {
+      if (nref >= b.arfcnStart && nref <= b.arfcnEnd) { matchedBand = b; dir = 'dl'; break }
+    }
+  }
+  return { freq, range, matchedBand, dir }
 }
 
-export function calcNrArfcn(band: NrBand, freq: number) {
-  if (freq < band.low || freq > band.high) return null
-  return Math.round(band.arfcnStart + (freq - band.low) * 1000 / band.deltaF)
+export function calcNrArfcn(band: NrBand, freq: number, dir: 'dl' | 'ul' = 'dl') {
+  let low: number, high: number, start: number, end: number
+  if (dir === 'dl' && band.dlLow !== undefined && band.dlHigh !== undefined && band.dlArfcnStart !== undefined) {
+    low = band.dlLow; high = band.dlHigh; start = band.dlArfcnStart; end = band.dlArfcnEnd ?? start
+  } else if (dir === 'ul' && band.ulLow !== undefined && band.ulHigh !== undefined && band.ulArfcnStart !== undefined) {
+    low = band.ulLow; high = band.ulHigh; start = band.ulArfcnStart; end = band.ulArfcnEnd ?? start
+  } else {
+    low = band.low; high = band.high; start = band.arfcnStart; end = band.arfcnEnd
+  }
+  if (freq < low || freq > high) return null
+  return Math.max(start, Math.min(end, Math.round(start + (freq - low) * 1000 / band.deltaF)))
 }
 
 export function decodeECI(eci: number) {

@@ -220,6 +220,7 @@ function NrTab() {
   const [nrFreqResult, setNrFreqResult] = useState<any>(null)
   const [nrBandSel, setNrBandSel] = useState('')
   const [nrFreqInput, setNrFreqInput] = useState('')
+  const [nrDirSel, setNrDirSel] = useState('dl')
   const [nrArfcnResult, setNrArfcnResult] = useState<any>(null)
 
   const handleNrFreq = () => {
@@ -234,9 +235,9 @@ function NrTab() {
     const band = NR_BANDS.find(b => b.band === nrBandSel)
     const freq = parseFloat(nrFreqInput)
     if (!band || isNaN(freq)) { setNrArfcnResult({ error: '请选择频段并输入频率' }); return }
-    const a = calcNrArfcn(band, freq)
-    if (!a) { setNrArfcnResult({ error: `频率超出 ${band.band} 范围` }); return }
-    setNrArfcnResult({ ok: true, band, arfcn: a, freq })
+    const a = calcNrArfcn(band, freq, nrDirSel as 'dl' | 'ul')
+    if (!a) { setNrArfcnResult({ error: `频率超出 ${band.band} ${nrDirSel.toUpperCase()} 范围` }); return }
+    setNrArfcnResult({ ok: true, band, arfcn: a, freq, dir: nrDirSel })
   }
 
   return (
@@ -257,7 +258,7 @@ function NrTab() {
                 <ResultRow label="中心频率" value={`${nrFreqResult.freq.toFixed(3)} MHz`} />
                 <ResultRow label="频率范围" value={nrFreqResult.range.range} />
                 <ResultRow label="全局栅格" value={`${nrFreqResult.range.deltaF} kHz`} />
-                <ResultRow label="匹配频段" value={nrFreqResult.matchedBand ? <><Badge color="sky">{nrFreqResult.matchedBand.band}</Badge> <Badge color={nrFreqResult.matchedBand.mode === 'FDD' ? 'sky' : 'emerald'}>{nrFreqResult.matchedBand.mode}</Badge></> : '未匹配到已知频段'} />
+                <ResultRow label="匹配频段" value={nrFreqResult.matchedBand ? <><Badge color="sky">{nrFreqResult.matchedBand.band}</Badge> <Badge color={nrFreqResult.matchedBand.mode === 'FDD' ? 'sky' : 'emerald'}>{nrFreqResult.matchedBand.mode}</Badge> {nrFreqResult.matchedBand.mode === 'FDD' && nrFreqResult.dir && <Badge color="slate">{nrFreqResult.dir.toUpperCase()}</Badge>}</> : '未匹配到已知频段'} />
               </ResultBox>
             )
           ) : <ResultBox empty><span className="text-sm">输入 NR-ARFCN 后点击计算</span></ResultBox>}
@@ -269,7 +270,7 @@ function NrTab() {
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">选择 NR 频段</label>
             <select value={nrBandSel} onChange={e => setNrBandSel(e.target.value)} className={`${inp} w-full`}>
               <option value="">-- 选择频段 --</option>
-              {NR_BANDS.map(b => <option key={b.band} value={b.band}>{b.band} ({b.mode}) {b.low}-{b.high} MHz [{b.arfcnStart}-{b.arfcnEnd}]</option>)}
+              {NR_BANDS.map(b => <option key={b.band} value={b.band}>{b.band} ({b.mode}) {b.mode === 'FDD' && b.dlLow ? `DL:${b.dlLow}-${b.dlHigh} / UL:${b.ulLow}-${b.ulHigh}` : `${b.low}-${b.high}`} MHz [{b.arfcnStart}-{b.arfcnEnd}]</option>)}
             </select>
           </div>
           <div className="mb-3">
@@ -277,11 +278,18 @@ function NrTab() {
             <input type="number" step={0.001} value={nrFreqInput} onChange={e => setNrFreqInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleNrArfcn()}
               className={`${inp} w-full`} placeholder="例如：3410.400" />
           </div>
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">方向</label>
+            <select value={nrDirSel} onChange={e => setNrDirSel(e.target.value)} className={`${inp} w-full`}>
+              <option value="dl">下行 (Downlink)</option>
+              <option value="ul">上行 (Uplink)</option>
+            </select>
+          </div>
           <button onClick={handleNrArfcn} className={btn}>计算 NR-ARFCN</button>
           {nrArfcnResult ? (
             nrArfcnResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{nrArfcnResult.error}</span>} /></ResultBox> : (
               <ResultBox>
-                <ResultRow label="频段" value={<><Badge color="sky">{nrArfcnResult.band.band}</Badge> <Badge color={nrArfcnResult.band.mode === 'FDD' ? 'sky' : 'emerald'}>{nrArfcnResult.band.mode}</Badge></>} />
+                <ResultRow label="频段" value={<><Badge color="sky">{nrArfcnResult.band.band}</Badge> <Badge color={nrArfcnResult.band.mode === 'FDD' ? 'sky' : 'emerald'}>{nrArfcnResult.band.mode}</Badge> {nrArfcnResult.band.mode === 'FDD' && <Badge color="slate">{nrArfcnResult.dir.toUpperCase()}</Badge>}</>} />
                 <ResultRow label="中心频率" value={`${nrArfcnResult.freq.toFixed(3)} MHz`} />
                 <ResultRow label="NR-ARFCN" value={<span className="text-lg text-sky-600">{nrArfcnResult.arfcn}</span>} />
                 <ResultRow label="全局栅格" value={`${nrArfcnResult.band.deltaF} kHz`} />
