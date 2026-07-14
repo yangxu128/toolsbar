@@ -102,7 +102,7 @@ export default function ColorPickerPage() {
   }, [])
 
   const CopyBtn = ({ text, label }: { text: string; label: string }) => (
-    <button onClick={() => copy(text, label)} className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]">
+    <button onClick={() => copy(text, label)} className="copy-btn">
       {copied === label ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
     </button>
   )
@@ -149,7 +149,7 @@ export default function ColorPickerPage() {
                 <div>
                   <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] flex items-center justify-between">HEX <CopyBtn text={hex} label="hex" /></label>
                   <input type="text" value={hex} onChange={e => { if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) setHex(e.target.value) }}
-                    className="w-full mt-1 px-3 py-2 rounded-lg border border-[hsl(var(--border))] text-sm font-mono bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] outline-none focus:border-pink-500" />
+                    className="form-input mt-1 text-sm font-mono" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] flex items-center justify-between">
@@ -165,7 +165,7 @@ export default function ColorPickerPage() {
                             const nr = ch === 'R' ? nv : r, ng = ch === 'G' ? nv : g, nb = ch === 'B' ? nv : b
                             setHex(rgbToHex(nr, ng, nb))
                           }}
-                          className="w-full px-2 py-1 rounded border border-[hsl(var(--border))] text-xs font-mono bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] outline-none" />
+                          className="form-input px-2 py-1 text-xs font-mono" />
                       </div>
                     ))}
                   </div>

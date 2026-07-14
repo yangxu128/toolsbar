@@ -18,8 +18,8 @@ const tabs = [
   { key: 'ref', label: '频段参考', icon: BookOpen },
 ]
 
-const inp = "px-3 py-2.5 rounded-lg border border-[hsl(var(--border))] text-sm outline-none focus:border-sky-500/50 bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]"
-const btn = "w-full py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium text-sm hover:opacity-90 active:scale-[0.97] transition-all cursor-pointer border-0"
+const inp = "form-input"
+const btn = "btn-primary bg-sky-500 hover:bg-sky-600 w-full"
 
 export default function RfCalculatorPage() {
   const [activeTab, setActiveTab] = useState('lte')
@@ -28,7 +28,7 @@ export default function RfCalculatorPage() {
   const fav = isFav('rf-calculator')
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       <nav className="flex items-center gap-2 text-sm mb-6 text-[hsl(var(--muted-foreground))]">
         <Link href="/" className="hover:text-[hsl(var(--primary))] transition-colors flex items-center gap-1">
           <Home className="w-4 h-4" />首页
@@ -52,7 +52,7 @@ export default function RfCalculatorPage() {
               </div>
             </div>
             <button onClick={() => toggleFav('rf-calculator')} className={`icon-btn shrink-0 ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}>
-              <Star className={`w-5 h-5 ${fav ? 'fill-current' : ''}`} />
+              <Star className={`w-5 h-5 ${fav ? 'fill-current animate-heart-beat' : ''}`} />
             </button>
           </div>
         </div>
@@ -77,20 +77,20 @@ export default function RfCalculatorPage() {
               const active = activeTab === tab.key
               return (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
-                    active ? 'bg-sky-500 text-white border-sky-500' : 'bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))] border-[hsl(var(--border))] hover:border-sky-500/50 hover:text-[hsl(var(--foreground))]'
-                  }`}>
+                  className={`tab-pill ${active ? 'active' : ''}`}>
                   <Icon className="w-4 h-4" />{tab.label}
                 </button>
               )
             })}
           </div>
 
-          {activeTab === 'lte' && <LteTab />}
-          {activeTab === 'nr' && <NrTab />}
-          {activeTab === 'eci' && <EciTab />}
-          {activeTab === 'nci' && <NciTab />}
-          {activeTab === 'ref' && <RefTab />}
+          <div className="animate-scale-in">
+            {activeTab === 'lte' && <LteTab />}
+            {activeTab === 'nr' && <NrTab />}
+            {activeTab === 'eci' && <EciTab />}
+            {activeTab === 'nci' && <NciTab />}
+            {activeTab === 'ref' && <RefTab />}
+          </div>
         </div>
       </div>
     </div>
@@ -99,7 +99,7 @@ export default function RfCalculatorPage() {
 
 function ResultBox({ children, empty }: { children: React.ReactNode; empty?: boolean }) {
   return (
-    <div className={`mt-4 p-4 rounded-xl ${empty ? 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] italic' : 'bg-sky-500/5 border border-sky-500/10'}`}>
+    <div className={`mt-4 rounded-xl ${empty ? 'empty-state' : 'result-card bg-sky-500/5 border-sky-500/10'}`}>
       {children}
     </div>
   )
@@ -151,12 +151,12 @@ function LteTab() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="rounded-xl border border-[hsl(var(--border)] bg-[hsl(var(--muted))] p-6">
+      <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6">
         <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><Signal className="w-4 h-4" />EARFCN → 频率</h3>
         <div className="mb-3">
           <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入 EARFCN (0 – 65535)</label>
           <input type="number" min={0} max={65535} value={earfcn} onChange={e => setEarfcn(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCalcFreq()}
-            className={`${inp} w-full`} placeholder="例如：1300" />
+            className={inp} placeholder="例如：1300" />
         </div>
         <button onClick={handleCalcFreq} className={btn}>计算频率与频段</button>
         {freqResult ? (
@@ -177,11 +177,11 @@ function LteTab() {
         ) : <ResultBox empty><span className="text-sm">输入 EARFCN 后点击计算</span></ResultBox>}
       </div>
 
-      <div className="rounded-xl border border-[hsl(var(--border)] bg-[hsl(var(--muted))] p-6">
+      <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6">
         <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><Signal className="w-4 h-4" />频率 → EARFCN</h3>
         <div className="mb-3">
           <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">选择频段</label>
-          <select value={bandSel} onChange={e => setBandSel(e.target.value)} className={`${inp} w-full`}>
+          <select value={bandSel} onChange={e => setBandSel(e.target.value)} className={inp}>
             <option value="">-- 选择频段 --</option>
             {LTE_BANDS.map(b => <option key={b.band} value={b.band}>Band {b.band} ({b.mode}) {b.mode === 'FDD' ? `UL:${b.ulLow}-${b.ulHigh} / DL:${b.dlLow}-${b.dlHigh}` : `TDD:${b.dlLow}-${b.dlHigh}`}</option>)}
           </select>
@@ -189,11 +189,11 @@ function LteTab() {
         <div className="mb-3">
           <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入中心频率 (MHz)</label>
           <input type="number" step={0.1} value={freqInput} onChange={e => setFreqInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCalcEarfcn()}
-            className={`${inp} w-full`} placeholder="例如：1815.0" />
+            className={inp} placeholder="例如：1815.0" />
         </div>
         <div className="mb-3">
           <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">方向</label>
-          <select value={dirSel} onChange={e => setDirSel(e.target.value)} className={`${inp} w-full`}>
+          <select value={dirSel} onChange={e => setDirSel(e.target.value)} className={inp}>
             <option value="dl">下行 (Downlink)</option>
             <option value="ul">上行 (Uplink)</option>
           </select>
@@ -243,12 +243,12 @@ function NrTab() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-[hsl(var(--border)] bg-[hsl(var(--muted))] p-6">
+        <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6">
           <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><Radio className="w-4 h-4" />NR-ARFCN → 频率</h3>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入 NR-ARFCN (0 – 3279165)</label>
             <input type="number" min={0} max={3279165} value={nrArfcn} onChange={e => setNrArfcn(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleNrFreq()}
-              className={`${inp} w-full`} placeholder="例如：620000" />
+              className={inp} placeholder="例如：620000" />
           </div>
           <button onClick={handleNrFreq} className={btn}>计算频率</button>
           {nrFreqResult ? (
@@ -264,11 +264,11 @@ function NrTab() {
           ) : <ResultBox empty><span className="text-sm">输入 NR-ARFCN 后点击计算</span></ResultBox>}
         </div>
 
-        <div className="rounded-xl border border-[hsl(var(--border)] bg-[hsl(var(--muted))] p-6">
+        <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6">
           <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><Radio className="w-4 h-4" />频率 → NR-ARFCN</h3>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">选择 NR 频段</label>
-            <select value={nrBandSel} onChange={e => setNrBandSel(e.target.value)} className={`${inp} w-full`}>
+            <select value={nrBandSel} onChange={e => setNrBandSel(e.target.value)} className={inp}>
               <option value="">-- 选择频段 --</option>
               {NR_BANDS.map(b => <option key={b.band} value={b.band}>{b.band} ({b.mode}) {b.mode === 'FDD' && b.dlLow ? `DL:${b.dlLow}-${b.dlHigh} / UL:${b.ulLow}-${b.ulHigh}` : `${b.low}-${b.high}`} MHz [{b.arfcnStart}-{b.arfcnEnd}]</option>)}
             </select>
@@ -276,11 +276,11 @@ function NrTab() {
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入SSB频率 (MHz)</label>
             <input type="number" step={0.001} value={nrFreqInput} onChange={e => setNrFreqInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleNrArfcn()}
-              className={`${inp} w-full`} placeholder="例如：3410.400" />
+              className={inp} placeholder="例如：3410.400" />
           </div>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">方向</label>
-            <select value={nrDirSel} onChange={e => setNrDirSel(e.target.value)} className={`${inp} w-full`}>
+            <select value={nrDirSel} onChange={e => setNrDirSel(e.target.value)} className={inp}>
               <option value="dl">下行 (Downlink)</option>
               <option value="ul">上行 (Uplink)</option>
             </select>
@@ -342,7 +342,7 @@ function EciTab() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-[hsl(var(--border)] bg-[hsl(var(--muted))] p-6">
+        <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6">
           <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><Building2 className="w-4 h-4" />ECI → eNB ID + Cell ID</h3>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入 ECI (十进制或十六进制)</label>
@@ -371,17 +371,17 @@ function EciTab() {
           ) : <ResultBox empty><span className="text-sm">输入 ECI 后点击解析</span></ResultBox>}
         </div>
 
-        <div className="rounded-xl border border-[hsl(var(--border)] bg-[hsl(var(--muted))] p-6">
+        <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6">
           <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><Building2 className="w-4 h-4" />eNB ID + Cell ID → ECI</h3>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">eNB ID (0 – 2²⁰-1 = 1048575)</label>
             <input type="number" min={0} max={1048575} value={enbId} onChange={e => setEnbId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleEncode()}
-              className={`${inp} w-full`} placeholder="例如：42496" />
+              className={inp} placeholder="例如：42496" />
           </div>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Cell ID (0 – 255)</label>
             <input type="number" min={0} max={255} value={cellId} onChange={e => setCellId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleEncode()}
-              className={`${inp} w-full`} placeholder="例如：1" />
+              className={inp} placeholder="例如：1" />
           </div>
           <button onClick={handleEncode} className={btn}>合成 ECI</button>
           {encodeResult ? (
@@ -444,7 +444,7 @@ function NciTab() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-[hsl(var(--border)] bg-[hsl(var(--muted))] p-6">
+        <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6">
           <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><TowerControl className="w-4 h-4" />NCI → gNB ID + Cell ID</h3>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入 NCI (十进制或十六进制)</label>
@@ -459,7 +459,7 @@ function NciTab() {
           </div>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">gNB ID 位长 (22 – 32 bits)</label>
-            <select value={gnbIdLen} onChange={e => setGnbIdLen(Number(e.target.value))} className={`${inp} w-full`}>
+            <select value={gnbIdLen} onChange={e => setGnbIdLen(Number(e.target.value))} className={inp}>
               <option value={22}>22 bits (Cell ID 14 bits)</option>
               <option value={24}>24 bits (Cell ID 12 bits)</option>
               <option value={26}>26 bits (Cell ID 10 bits)</option>
@@ -486,21 +486,21 @@ function NciTab() {
           ) : <ResultBox empty><span className="text-sm">输入 NCI 后点击解析</span></ResultBox>}
         </div>
 
-        <div className="rounded-xl border border-[hsl(var(--border)] bg-[hsl(var(--muted))] p-6">
+        <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6">
           <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><TowerControl className="w-4 h-4" />gNB ID + Cell ID → NCI</h3>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">gNB ID</label>
             <input type="number" min={0} value={gnbId} onChange={e => setGnbId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleEncode()}
-              className={`${inp} w-full`} placeholder="例如：10598595" />
+              className={inp} placeholder="例如：10598595" />
           </div>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Cell ID</label>
             <input type="number" min={0} value={nciCellId} onChange={e => setNciCellId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleEncode()}
-              className={`${inp} w-full`} placeholder="例如：980" />
+              className={inp} placeholder="例如：980" />
           </div>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">gNB ID 位长</label>
-            <select value={gnbIdLenEnc} onChange={e => setGnbIdLenEnc(Number(e.target.value))} className={`${inp} w-full`}>
+            <select value={gnbIdLenEnc} onChange={e => setGnbIdLenEnc(Number(e.target.value))} className={inp}>
               <option value={22}>22 bits</option>
               <option value={24}>24 bits</option>
               <option value={26}>26 bits</option>
@@ -516,7 +516,7 @@ function NciTab() {
                 <ResultRow label="NCI (十六进制)" value={`0x${encodeResult.nci.toString(16).toUpperCase().padStart(9, '0')}`} />
                 <ResultRow label="gNB ID" value={`${encodeResult.gnbId} (0x${encodeResult.gnbId.toString(16).toUpperCase()}) [${encodeResult.gnbIdLen} bits]`} />
                 <ResultRow label="Cell ID" value={`${encodeResult.cellId} (0x${encodeResult.cellId.toString(16).toUpperCase()}) [${36 - encodeResult.gnbIdLen} bits]`} />
-                <ResultRow label="公式验证" value={`(${encodeResult.gnbId} << ${36 - encodeResult.gnbIdLen}) | ${encodeResult.cellId} = ${encodeResult.nci}`} />
+                <ResultRow label="公式验证" value={`(${encodeResult.gnbId} &lt;&lt; ${36 - encodeResult.gnbIdLen}) | ${encodeResult.cellId} = ${encodeResult.nci}`} />
               </ResultBox>
             )
           ) : <ResultBox empty><span className="text-sm">输入 gNB ID 和 Cell ID 后点击合成</span></ResultBox>}
@@ -569,7 +569,7 @@ function RefTab() {
   ]
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-6">
       <div>
         <h3 className="text-base font-semibold text-[hsl(var(--foreground))] mb-3 flex items-center gap-2"><Signal className="w-4 h-4 text-sky-600" />LTE 频段 EARFCN 参考表</h3>
         <UnifiedTable columns={lteColumns} data={lteRefData} pagination pageSize={10} showTotal />

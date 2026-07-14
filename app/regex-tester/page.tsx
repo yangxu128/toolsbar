@@ -108,17 +108,17 @@ export default function RegexTesterPage() {
           <div className="flex items-center gap-2 mb-2">
             <span className="text-cyan-500 font-mono text-lg">/</span>
             <input type="text" value={pattern} onChange={e => setPattern(e.target.value)} placeholder="输入正则表达式..."
-              className="flex-1 px-3 py-2 rounded-lg border border-[hsl(var(--border))] text-sm font-mono bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] outline-none focus:border-cyan-500" />
+              className="form-input flex-1 text-sm font-mono" />
             <span className="text-cyan-500 font-mono text-lg">/</span>
             <input type="text" value={flags} onChange={e => setFlags(e.target.value)} placeholder="flags"
-              className="w-16 px-2 py-2 rounded-lg border border-[hsl(var(--border))] text-sm font-mono bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] outline-none focus:border-cyan-500 text-center" />
+              className="form-input w-16 px-2 text-sm font-mono text-center" />
           </div>
 
           {/* 标志位 */}
           <div className="flex flex-wrap gap-2 mb-4">
             {[['g', '全局'], ['i', '忽略大小写'], ['m', '多行'], ['s', '单行']].map(([f, label]) => (
               <button key={f} onClick={() => toggleFlag(f)}
-                className={`px-2 py-1 rounded text-[10px] font-medium ${flags.includes(f) ? 'bg-cyan-500 text-white' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+                className={`tab-pill text-[10px] py-1 px-2 ${flags.includes(f) ? 'active !bg-cyan-500 !border-cyan-500' : ''}`}>
                 {f} - {label}
               </button>
             ))}
@@ -128,7 +128,7 @@ export default function RegexTesterPage() {
           <div className="flex flex-wrap gap-1.5 mb-4">
             {presets.map(p => (
               <button key={p.name} onClick={() => { setPattern(p.pattern.source); setFlags('g') }}
-                className="px-2 py-1 rounded-md bg-[hsl(var(--muted))] text-[10px] text-[hsl(var(--muted-foreground))] hover:bg-cyan-100 dark:hover:bg-cyan-900/30 hover:text-cyan-600 transition-colors">
+                className="tab-pill text-[10px] py-1 px-2 hover:text-cyan-600">
                 {p.name}
               </button>
             ))}
@@ -138,7 +138,7 @@ export default function RegexTesterPage() {
           <div className="flex items-center gap-2 mb-4">
             {(['match', 'replace', 'split'] as const).map(m => (
               <button key={m} onClick={() => setMode(m)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mode === m ? 'bg-cyan-500 text-white' : 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]'}`}>
+                className={`tab-pill ${mode === m ? 'active !bg-cyan-500 !border-cyan-500' : ''}`}>
                 {{ match: '匹配', replace: '替换', split: '分割' }[m]}
               </button>
             ))}
@@ -148,12 +148,12 @@ export default function RegexTesterPage() {
           <div className="mb-4">
             <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">测试文本</label>
             <textarea value={testStr} onChange={e => setTestStr(e.target.value)} placeholder="输入要测试的文本..."
-              className="w-full h-32 p-3 rounded-xl border border-[hsl(var(--border))] text-sm font-mono bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] resize-none outline-none focus:border-cyan-500" />
+              className="form-input h-32 p-3 text-sm font-mono resize-none" />
           </div>
 
           {/* 高亮匹配 */}
           {testStr && regex && (
-            <div className="mb-4 p-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+            <div className="result-card mb-4">
               <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">匹配高亮</label>
               <div className="text-sm font-mono break-all leading-relaxed">
                 {typeof highlighted === 'string' ? highlighted : (highlighted as { text: string; isMatch: boolean }[]).map((part, i) =>
@@ -170,18 +170,18 @@ export default function RegexTesterPage() {
             <div className="mb-4">
               <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">替换为</label>
               <input type="text" value={replaceStr} onChange={e => setReplaceStr(e.target.value)} placeholder="替换字符串（支持$1,$2...）"
-                className="w-full px-3 py-2 rounded-lg border border-[hsl(var(--border))] text-sm font-mono bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] outline-none focus:border-cyan-500" />
+                className="form-input text-sm font-mono" />
             </div>
           )}
 
           {/* 结果 */}
           {(matches.length > 0 || result) && (
-            <div className="mb-4 p-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+            <div className="result-card mb-4">
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
                   {mode === 'match' ? `匹配结果 (${matches.length}个)` : '处理结果'}
                 </label>
-                <button onClick={copyResult} className="text-xs text-[hsl(var(--muted-foreground))] hover:text-cyan-500 flex items-center gap-1">
+                <button onClick={copyResult} className="copy-btn hover:text-cyan-500">
                   {copied ? <><Check className="w-3 h-3" />已复制</> : <><Copy className="w-3 h-3" />复制</>}
                 </button>
               </div>
@@ -203,7 +203,7 @@ export default function RegexTesterPage() {
 
           {/* 正则错误 */}
           {pattern && !regex && (
-            <div className="mb-4 p-3 rounded-xl border border-red-300 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 text-xs">
+            <div className="error-state mb-4">
               正则表达式语法错误
             </div>
           )}

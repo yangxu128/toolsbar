@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import {
   Settings2, Trash2, Database, FileSpreadsheet, FileCode,
-  Sun, Moon, HardDrive, RefreshCw, AlertTriangle
+  Sun, Moon, HardDrive, RefreshCw, AlertTriangle, Home, Star, ChevronRight
 } from 'lucide-react'
 import { useKpiStore } from '@/lib/store'
 import { useXmlStore } from '@/lib/xml-store'
 import { useThemeStore } from '@/lib/theme-store'
+import { useFavStore } from '@/lib/fav-store'
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return '0 B'
@@ -36,6 +38,10 @@ interface StoreInfo {
 }
 
 export default function SettingsPage() {
+  const isFav = useFavStore((s) => s.isFav)
+  const toggleFav = useFavStore((s) => s.toggleFav)
+  const fav = isFav('settings')
+
   const theme = useThemeStore((s) => s.theme)
   const toggleTheme = useThemeStore((s) => s.toggleTheme)
 
@@ -109,98 +115,124 @@ export default function SettingsPage() {
   const totalSize = Object.values(sizes).reduce((a, b) => a + b, 0)
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">配置管理中心</h2>
-        <p className="text-sm text-muted mt-0.5">查看和管理浏览器本地存储的所有数据</p>
-      </div>
+    <div className="animate-fade-in-up">
+      <nav className="flex items-center gap-2 text-sm mb-6 text-[hsl(var(--muted-foreground))]">
+        <Link href="/" className="hover:text-[hsl(var(--primary))] transition-colors flex items-center gap-1">
+          <Home className="w-4 h-4" />首页
+        </Link>
+        <ChevronRight className="w-4 h-4" />
+        <span>系统</span>
+        <ChevronRight className="w-4 h-4" />
+        <span className="text-[hsl(var(--foreground))] font-medium">配置管理中心</span>
+      </nav>
 
-      <div className="card-dark rounded-lg p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-md bg-[hsl(var(--muted))] flex items-center justify-center">
-            <HardDrive className="w-4 h-4 text-muted" />
-          </div>
-          <div>
-            <div className="text-sm font-medium">本地存储总用量</div>
-            <div className="text-xs text-muted">{formatBytes(totalSize)} · localStorage</div>
+      <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm mb-6">
+        <div className="p-6 sm:p-8 border-b border-[hsl(var(--border))]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-[hsl(var(--primary))] flex items-center justify-center shrink-0">
+                <Settings2 className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-[hsl(var(--foreground))]">配置管理中心</h2>
+                <p className="text-[hsl(var(--muted-foreground))] mt-1">查看和管理浏览器本地存储的所有数据</p>
+              </div>
+            </div>
+            <button onClick={() => toggleFav('settings')} className={`icon-btn shrink-0 ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}>
+              <Star className={`w-5 h-5 ${fav ? 'fill-current animate-heart-beat' : ''}`} />
+            </button>
           </div>
         </div>
-        <button onClick={refreshSizes} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-muted hover:bg-[hsl(var(--muted))] transition-colors">
-          <RefreshCw className="w-3 h-3" /> 刷新
-        </button>
-      </div>
 
-      <div className="space-y-2">
-        <h3 className="text-sm font-medium">数据存储项</h3>
-        {stores.map(store => {
-          const Icon = store.icon
-          return (
-            <div key={store.key} className="card-dark rounded-lg p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center text-white" style={{ background: store.color }}>
-                    <Icon className="w-4 h-4" />
+        <div className="p-6 sm:p-8 space-y-6">
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] flex items-center justify-center">
+                <HardDrive className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-[hsl(var(--foreground))]">本地存储总用量</div>
+                <div className="text-xs text-[hsl(var(--muted-foreground))]">{formatBytes(totalSize)} · localStorage</div>
+              </div>
+            </div>
+            <button onClick={refreshSizes} className="btn-primary">
+              <RefreshCw className="w-3.5 h-3.5" /> 刷新
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">数据存储项</h3>
+            {stores.map(store => {
+              const Icon = store.icon
+              return (
+                <div key={store.key} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white" style={{ background: store.color }}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-[hsl(var(--foreground))]">{store.name}</div>
+                        <div className="text-[11px] text-[hsl(var(--muted-foreground))] mt-0.5">{store.detail}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${store.loaded ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))] border-[hsl(var(--border))]'}`}>
+                        {store.loaded ? '已存储' : '空'}
+                      </span>
+                      <span className="text-[11px] tabular-nums text-[hsl(var(--muted-foreground))] min-w-[48px] text-right">{formatBytes(store.size)}</span>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-medium">{store.name}</div>
-                    <div className="text-[11px] text-muted mt-0.5">{store.detail}</div>
+
+                  <div className="flex items-center gap-2 pt-3 border-t border-[hsl(var(--border))]">
+                    {confirmTarget === store.key ? (
+                      <>
+                        <span className="text-[11px] text-red-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> 确定清除？</span>
+                        <button onClick={() => { store.onClear(); setConfirmTarget(null) }}
+                          className="px-2 py-1 rounded-md bg-red-500 text-white text-[11px] font-medium">确认</button>
+                        <button onClick={() => setConfirmTarget(null)}
+                          className="px-2 py-1 rounded-md text-[11px] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--card))]">取消</button>
+                      </>
+                    ) : (
+                      <button onClick={() => setConfirmTarget(store.key)}
+                        disabled={!store.loaded}
+                        className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-red-500 hover:bg-red-500/10 disabled:opacity-30 transition-colors">
+                        <Trash2 className="w-3 h-3" /> 清除
+                      </button>
+                    )}
+                    <span className="text-[10px] text-[hsl(var(--muted-foreground))] ml-auto font-mono">{store.key}</span>
                   </div>
                 </div>
+              )
+            })}
+          </div>
+
+          <div className="rounded-xl p-4 border border-red-500/20 bg-red-500/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-red-500/10 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-red-500">危险操作区</div>
+                  <div className="text-[11px] text-[hsl(var(--muted-foreground))]">清除所有本地数据，包括主题设置和所有工具数据</div>
+                </div>
+              </div>
+              {confirmTarget === '__ALL__' ? (
                 <div className="flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${store.loaded ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-[hsl(var(--secondary))] text-muted border border-[hsl(var(--border)))]'}`}>
-                    {store.loaded ? '已存储' : '空'}
-                  </span>
-                  <span className="text-[11px] tabular-nums text-muted min-w-[48px] text-right">{formatBytes(store.size)}</span>
+                  <button onClick={clearAll}
+                    className="px-3 py-1.5 rounded-md bg-red-500 text-white text-xs font-medium">确认全部清除</button>
+                  <button onClick={() => setConfirmTarget(null)}
+                    className="px-2 py-1.5 rounded-md text-xs text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--card))]">取消</button>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-2 border-t border-[hsl(var(--border))]">
-                {confirmTarget === store.key ? (
-                  <>
-                    <span className="text-[11px] text-red-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> 确定清除？</span>
-                    <button onClick={() => { store.onClear(); setConfirmTarget(null) }}
-                      className="px-2 py-1 rounded-md bg-red-500 text-white text-[11px] font-medium">确认</button>
-                    <button onClick={() => setConfirmTarget(null)}
-                      className="px-2 py-1 rounded-md text-[11px] text-muted hover:bg-[hsl(var(--muted))]">取消</button>
-                  </>
-                ) : (
-                  <button onClick={() => setConfirmTarget(store.key)}
-                    disabled={!store.loaded}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-red-500 hover:bg-red-500/10 disabled:opacity-30 transition-colors">
-                    <Trash2 className="w-3 h-3" /> 清除
-                  </button>
-                )}
-                <span className="text-[10px] text-muted ml-auto font-mono">{store.key}</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      <div className="card-dark rounded-lg p-4 border border-red-500/20">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-md bg-red-500/10 flex items-center justify-center">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
-            </div>
-            <div>
-              <div className="text-sm font-medium text-red-500">危险操作区</div>
-              <div className="text-[11px] text-muted">清除所有本地数据，包括主题设置和所有工具数据</div>
+              ) : (
+                <button onClick={() => setConfirmTarget('__ALL__')}
+                  className="px-3 py-1.5 rounded-md border border-red-500/30 text-red-500 text-xs font-medium hover:bg-red-500/10 transition-colors">
+                  清除全部数据
+                </button>
+              )}
             </div>
           </div>
-          {confirmTarget === '__ALL__' ? (
-            <div className="flex items-center gap-2">
-              <button onClick={clearAll}
-                className="px-3 py-1.5 rounded-md bg-red-500 text-white text-xs font-medium">确认全部清除</button>
-              <button onClick={() => setConfirmTarget(null)}
-                className="px-2 py-1.5 rounded-md text-xs text-muted hover:bg-[hsl(var(--muted))]">取消</button>
-            </div>
-          ) : (
-            <button onClick={() => setConfirmTarget('__ALL__')}
-              className="px-3 py-1.5 rounded-md border border-red-500/30 text-red-500 text-xs font-medium hover:bg-red-500/10 transition-colors">
-              清除全部数据
-            </button>
-          )}
         </div>
       </div>
     </div>

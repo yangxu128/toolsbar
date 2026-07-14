@@ -86,11 +86,11 @@ export default function Base64ToolPage() {
         <div className="p-6 sm:p-8">
           <div className="flex items-center gap-3 mb-4">
             <button onClick={() => setMode('encode')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mode === 'encode' ? 'bg-indigo-500 text-white' : 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]'}`}>
+              className={`tab-pill ${mode === 'encode' ? 'active !bg-indigo-500 !border-indigo-500' : ''}`}>
               编码
             </button>
             <button onClick={() => setMode('decode')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mode === 'decode' ? 'bg-indigo-500 text-white' : 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]'}`}>
+              className={`tab-pill ${mode === 'decode' ? 'active !bg-indigo-500 !border-indigo-500' : ''}`}>
               解码
             </button>
             {mode === 'encode' && (
@@ -100,7 +100,7 @@ export default function Base64ToolPage() {
                 input.accept = 'image/*,.pdf,.txt'
                 input.onchange = (e: any) => e.target.files?.[0] && handleFileUpload(e.target.files[0])
                 input.click()
-              }} className="ml-auto px-3 py-1.5 rounded-lg text-xs font-medium bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] hover:bg-indigo-100 dark:hover:bg-indigo-900/30 flex items-center gap-1">
+              }} className="tab-pill ml-auto">
                 <Upload className="w-3 h-3" />上传文件
               </button>
             )}
@@ -110,20 +110,20 @@ export default function Base64ToolPage() {
             <div>
               <span className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-2 block">输入（{mode === 'encode' ? '文本' : 'Base64字符串'}）</span>
               <textarea value={input} onChange={e => setInput(e.target.value)} placeholder={mode === 'encode' ? '输入要编码的文本...' : '输入Base64字符串...'}
-                className="w-full h-60 p-3 rounded-xl border border-[hsl(var(--border))] text-xs font-mono bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] resize-none outline-none focus:border-indigo-500" />
+                className="form-input h-60 p-3 text-xs font-mono resize-none" />
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">输出</span>
                 <div className="flex items-center gap-2">
-                  <button onClick={handleSwap} className="text-xs text-[hsl(var(--muted-foreground))] hover:text-indigo-500 flex items-center gap-1"><ArrowRightLeft className="w-3 h-3" />交换</button>
-                  <button onClick={handleCopy} className="text-xs text-[hsl(var(--muted-foreground))] hover:text-indigo-500 flex items-center gap-1">
+                  <button onClick={handleSwap} className="copy-btn hover:text-indigo-500"><ArrowRightLeft className="w-3 h-3" />交换</button>
+                  <button onClick={handleCopy} className="copy-btn hover:text-indigo-500">
                     {copied ? <><Check className="w-3 h-3" />已复制</> : <><Copy className="w-3 h-3" />复制</>}
                   </button>
                 </div>
               </div>
               <textarea value={error || output} readOnly placeholder='处理结果...'
-                className={`w-full h-60 p-3 rounded-xl border text-xs font-mono resize-none outline-none ${error ? 'border-red-300 bg-red-50 dark:bg-red-900/10 text-red-600' : 'border-[hsl(var(--border))] bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]'}`} />
+                className={`w-full h-60 p-3 rounded-xl border text-xs font-mono resize-none outline-none transition-all ${error ? 'error-state' : 'form-input'}`} />
             </div>
           </div>
 
@@ -135,7 +135,7 @@ export default function Base64ToolPage() {
           )}
 
           <button onClick={handleProcess}
-            className="mt-4 w-full py-2.5 rounded-xl bg-indigo-500 text-white font-medium text-sm hover:opacity-90 active:scale-[0.98] transition-all">
+            className="mt-4 w-full btn-primary bg-indigo-500 hover:bg-indigo-600">
             {mode === 'encode' ? '编码' : '解码'}
           </button>
 

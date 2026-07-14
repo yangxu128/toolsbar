@@ -48,7 +48,7 @@ export default function XmlPage() {
   }))
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       <nav className="flex items-center gap-2 text-sm mb-6 text-[hsl(var(--muted-foreground))]">
         <Link href="/" className="hover:text-[hsl(var(--primary))] transition-colors flex items-center gap-1">
           <Home className="w-4 h-4" />首页
@@ -72,7 +72,7 @@ export default function XmlPage() {
               </div>
             </div>
             <button onClick={() => toggleFav('xml-reader')} className={`icon-btn shrink-0 ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}>
-              <Star className={`w-5 h-5 ${fav ? 'fill-current' : ''}`} />
+              <Star className={`w-5 h-5 ${fav ? 'fill-current animate-heart-beat' : ''}`} />
             </button>
           </div>
         </div>
@@ -81,12 +81,12 @@ export default function XmlPage() {
           {!loaded ? (
             <UploadArea onUpload={handleUpload} error={errorMsg} />
           ) : (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="animate-scale-in space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium truncate max-w-[280px]" title={fileName}>
                   {fileName}
                 </span>
-                <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors">
+                <button onClick={handleExport} className="btn-primary bg-blue-500 hover:bg-blue-600">
                   <Download className="w-4 h-4" /> 导出CSV
                 </button>
               </div>
@@ -100,10 +100,10 @@ export default function XmlPage() {
                 pageSizeOptions={[10, 20, 50, 100]}
                 showTotal
               />
-              <button onClick={() => useXmlStore.getState().clearData()} className="mt-4 flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors">
+              <button onClick={() => useXmlStore.getState().clearData()} className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors">
                 <X className="w-3.5 h-3.5" /> 清除数据，重新上传
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -120,8 +120,8 @@ function UploadArea({ onUpload, error }: { onUpload: (f: File) => void; error: s
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f?.name.match(/\.(xml|csv)$/i)) onUpload(f) }}
         onClick={() => document.getElementById('xml-file-input')?.click()}
-        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors ${
-          dragging ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)]' : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary))]'
+        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
+          dragging ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)]' : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary))] hover:bg-[hsl(var(--muted))]/50'
         }`}>
         <input id="xml-file-input" type="file" accept=".xml,.csv"
           onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} className="hidden" />
@@ -130,11 +130,11 @@ function UploadArea({ onUpload, error }: { onUpload: (f: File) => void; error: s
         </div>
         <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] mb-2">拖拽 XML / CSV 文件到此处</h3>
         <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">点击或拖拽 .xml / .csv 文件到此区域</p>
-        <button className="px-4 py-2 bg-[hsl(var(--primary))] text-white rounded-lg font-medium text-sm hover:opacity-90 active:scale-[0.97] transition-all">
+        <button className="btn-primary bg-blue-500 hover:bg-blue-600">
           选择文件
         </button>
       </div>
-      {error && <div className="mt-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-xs">{error}</div>}
+      {error && <div className="error-state mt-3">{error}</div>}
       <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))] space-y-2">
         <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
         <div className="text-[11px] space-y-1">
