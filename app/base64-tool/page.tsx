@@ -18,6 +18,7 @@ export default function Base64ToolPage() {
   const [mode, setMode] = useState<Mode>('encode')
   const [copied, setCopied] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [urlSafe, setUrlSafe] = useState(false)
 
   const handleProcess = useCallback(() => {
     setError('')
@@ -25,14 +26,26 @@ export default function Base64ToolPage() {
     if (!input.trim()) return
     try {
       if (mode === 'encode') {
-        setOutput(btoa(unescape(encodeURIComponent(input))))
+        const bytes = new TextEncoder().encode(input)
+        let binary = ''
+        bytes.forEach(b => binary += String.fromCharCode(b))
+        let result = btoa(binary)
+        if (urlSafe) result = result.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+        setOutput(result)
       } else {
-        setOutput(decodeURIComponent(escape(atob(input.trim()))))
+        let str = input.trim()
+        if (urlSafe) str = str.replace(/-/g, '+').replace(/_/g, '/')
+        while (str.length % 4) str += '='
+        const binary = atob(str)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        const result = new TextDecoder().decode(bytes)
+        setOutput(result)
       }
     } catch (e: any) {
-      setError('转换失败：输入内容格式不正确')
+      setError(mode === 'encode' ? '编码失败：输入内容包含无法处理的字符' : '解码失败：输入的 Base64 字符串格式不正确')
     }
-  }, [input, mode])
+  }, [input, mode, urlSafe])
 
   const handleFileUpload = useCallback((file: File) => {
     const reader = new FileReader()
@@ -44,6 +57,12 @@ export default function Base64ToolPage() {
       else setImagePreview(null)
     }
     reader.readAsDataURL(file)
+  }, [])
+
+  const handleDecodeFileUpload = useCallback((file: File) => {
+    const reader = new FileReader()
+    reader.onload = () => setInput(String(reader.result || '').trim())
+    reader.readAsText(file)
   }, [])
 
   const handleCopy = useCallback(() => {
@@ -84,7 +103,7 @@ export default function Base64ToolPage() {
         </div>
 
         <div className="p-6 sm:p-8">
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
             <button onClick={() => setMode('encode')}
               className={`tab-pill ${mode === 'encode' ? 'active !bg-indigo-500 !border-indigo-500' : ''}`}>
               编码
@@ -93,13 +112,27 @@ export default function Base64ToolPage() {
               className={`tab-pill ${mode === 'decode' ? 'active !bg-indigo-500 !border-indigo-500' : ''}`}>
               解码
             </button>
-            {mode === 'encode' && (
+            <button onClick={() => setUrlSafe(v => !v)}
+              className={`tab-pill text-[10px] ${urlSafe ? 'active !bg-indigo-500 !border-indigo-500' : ''}`}>
+              URL Safe
+            </button>
+            {mode === 'encode' ? (
               <button onClick={() => {
-                const input = document.createElement('input')
-                input.type = 'file'
-                input.accept = 'image/*,.pdf,.txt'
-                input.onchange = (e: any) => e.target.files?.[0] && handleFileUpload(e.target.files[0])
-                input.click()
+                const inp = document.createElement('input')
+                inp.type = 'file'
+                inp.accept = 'image/*,.pdf,.txt'
+                inp.onchange = (e: any) => e.target.files?.[0] && handleFileUpload(e.target.files[0])
+                inp.click()
+              }} className="tab-pill ml-auto">
+                <Upload className="w-3 h-3" />上传文件
+              </button>
+            ) : (
+              <button onClick={() => {
+                const inp = document.createElement('input')
+                inp.type = 'file'
+                inp.accept = '.txt,.base64,.json'
+                inp.onchange = (e: any) => e.target.files?.[0] && handleDecodeFileUpload(e.target.files[0])
+                inp.click()
               }} className="tab-pill ml-auto">
                 <Upload className="w-3 h-3" />上传文件
               </button>

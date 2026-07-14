@@ -2,10 +2,22 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { FileCode, Home, Star, ChevronRight as ChevronRightIcon, Copy, Check, Trash2, ArrowRightLeft } from 'lucide-react'
+import { FileCode, Home, Star, ChevronRight as ChevronRightIcon, Copy, Check, Trash2, ArrowRightLeft, Upload } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
 type Mode = 'format' | 'minify' | 'validate'
+
+function parseJsonError(msg: string, input: string): string {
+  const posMatch = msg.match(/position (\d+)/i)
+  if (posMatch) {
+    const pos = +posMatch[1]
+    const before = input.substring(0, pos)
+    const line = before.split('\n').length
+    const col = pos - before.lastIndexOf('\n')
+    return `${msg} (行 ${line}, 列 ${col})`
+  }
+  return msg
+}
 
 export default function JsonFormatterPage() {
   const isFav = useFavStore(s => s.isFav)
@@ -16,7 +28,7 @@ export default function JsonFormatterPage() {
   const [output, setOutput] = useState('')
   const [error, setError] = useState('')
   const [mode, setMode] = useState<Mode>('format')
-  const [indent, setIndent] = useState(2)
+  const [indent, setIndent] = useState<number | string>(2)
   const [copied, setCopied] = useState(false)
 
   const handleProcess = useCallback(() => {
@@ -25,17 +37,25 @@ export default function JsonFormatterPage() {
     if (!input.trim()) return
     try {
       const parsed = JSON.parse(input)
-      if (mode === 'minify') {
+      if (mode === 'validate') {
+        setOutput('JSON 格式有效 ✓')
+      } else if (mode === 'minify') {
         setOutput(JSON.stringify(parsed))
       } else {
         setOutput(JSON.stringify(parsed, null, indent))
       }
     } catch (e: any) {
-      setError(e.message)
-      if (mode === 'validate') setOutput('JSON 格式无效')
+      setError(parseJsonError(e.message, input))
+      if (mode === 'validate') setOutput('JSON 格式无效 ✗')
       else setOutput('')
     }
   }, [input, mode, indent])
+
+  const handleFileUpload = useCallback((file: File) => {
+    const reader = new FileReader()
+    reader.onload = () => setInput(String(reader.result || ''))
+    reader.readAsText(file)
+  }, [])
 
   const handleCopy = useCallback(() => {
     if (!output) return
@@ -90,11 +110,14 @@ export default function JsonFormatterPage() {
             {mode === 'format' && (
               <div className="flex items-center gap-2 ml-2">
                 <label className="text-xs text-[hsl(var(--muted-foreground))]">缩进：</label>
-                <select value={indent} onChange={e => setIndent(+e.target.value)}
+                <select value={indent} onChange={e => {
+                  const v = e.target.value
+                  setIndent(v === '\t' ? '\t' : +v)
+                }}
                   className="form-input w-auto min-w-[80px] text-xs py-1.5">
                   <option value={2}>2空格</option>
                   <option value={4}>4空格</option>
-                  <option value={1}>1Tab</option>
+                  <option value={'\t'}>1Tab</option>
                 </select>
               </div>
             )}
@@ -104,7 +127,16 @@ export default function JsonFormatterPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">输入</span>
-                <button onClick={handleClear} className="copy-btn hover:text-red-500"><Trash2 className="w-3 h-3" />清空</button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => {
+                    const inp = document.createElement('input')
+                    inp.type = 'file'
+                    inp.accept = '.json'
+                    inp.onchange = (e: any) => e.target.files?.[0] && handleFileUpload(e.target.files[0])
+                    inp.click()
+                  }} className="copy-btn hover:text-violet-500"><Upload className="w-3 h-3" />上传</button>
+                  <button onClick={handleClear} className="copy-btn hover:text-red-500"><Trash2 className="w-3 h-3" />清空</button>
+                </div>
               </div>
               <textarea value={input} onChange={e => setInput(e.target.value)} placeholder='粘贴 JSON 数据...'
                 className="form-input h-80 p-3 font-mono text-xs resize-none" />

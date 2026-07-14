@@ -48,83 +48,88 @@ export default function CalcGrid() {
 
   const timeCol = useMemo(() => findCol(['开始时间', 'starttime', 'start_time', '时间']), [headers])
   const subnetCol = useMemo(() => findCol(['子网名称', 'subnetname', 'subnet_name', '网元名称']), [headers])
+  const labelColA = useMemo(() => {
+    const c = findCol(['网元', '小区', 'cell', '名称', '基站', 'subnet'])
+    return c >= 0 ? c : 5
+  }, [headers])
+  const labelColB = useMemo(() => {
+    const c = findCol(['开始时间', 'starttime', 'time', '时间'])
+    return c >= 0 ? c : 10
+  }, [headers])
+
+  const getRowLabel = (row: any) => `${row?.[labelColA] ?? ''} - ${row?.[labelColB] ?? ''}`
 
   const handleCalc = () => {
     if (mode === 'none') {
       if (rowIndex === null) return
-      setLoading(true)
-      setTimeout(() => { setResults(calcAll(rowIndex)); setLoading(false) }, 50)
+      setResults(calcAll(rowIndex))
       return
     }
 
-    setLoading(true)
-    setTimeout(() => {
-      const groups = new Map<string, { key: string; rows: number[] }>()
+    const groups = new Map<string, { key: string; rows: number[] }>()
 
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i]
-        let key = ''
-        if (mode === 'time') {
-          key = timeCol >= 0 ? String(row[timeCol] ?? '').trim() : ''
-        } else if (mode === 'subnet') {
-          key = subnetCol >= 0 ? String(row[subnetCol] ?? '').trim() : ''
-        } else if (mode === 'city') {
-          const raw = subnetCol >= 0 ? String(row[subnetCol] ?? '').trim() : ''
-          key = raw.replace(/\s/g, '').slice(0, 2)
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]
+      let key = ''
+      if (mode === 'time') {
+        key = timeCol >= 0 ? String(row[timeCol] ?? '').trim() : ''
+      } else if (mode === 'subnet') {
+        key = subnetCol >= 0 ? String(row[subnetCol] ?? '').trim() : ''
+      } else if (mode === 'city') {
+        const raw = subnetCol >= 0 ? String(row[subnetCol] ?? '').trim() : ''
+        key = raw.replace(/\s/g, '').slice(0, 2)
+      }
+      if (!key) key = '未知'
+      if (!groups.has(key)) groups.set(key, { key, rows: [] })
+      groups.get(key)!.rows.push(i)
+    }
+
+    const allCounterIds = new Set<string>()
+    for (const m of metrics) {
+      if (!m.formula) continue
+      const ids = m.formula.match(/C\d+/g) || []
+      ids.forEach(id => allCounterIds.add(id))
+    }
+
+    const allMetrics = new Set<string>()
+    const groupResults: any[] = []
+
+    for (const [key, g] of groups) {
+      const counterSums: Record<string, number> = {}
+      for (const ri of g.rows) {
+        const row = rows[ri]
+        for (const id of allCounterIds) {
+          const colIdx = headers.findIndex((h: string) => h.startsWith(id + ':') || h === id)
+          const v = colIdx >= 0 ? parseFloat(String(row[colIdx] ?? '').replace(/,/g, '')) || 0 : 0
+          counterSums[id] = (counterSums[id] || 0) + v
         }
-        if (!key) key = '未知'
-        if (!groups.has(key)) groups.set(key, { key, rows: [] })
-        groups.get(key)!.rows.push(i)
       }
 
-      const allCounterIds = new Set<string>()
+      const metricSums: Record<string, number> = {}
+      const metricSteps: Record<string, string[]> = {}
       for (const m of metrics) {
         if (!m.formula) continue
-        const ids = m.formula.match(/C?\d+/g) || []
-        ids.forEach(id => allCounterIds.add(id))
+        const r = evaluateFormulaWithValues(m.formula, counterSums)
+        if (!r || r.result === null || r.error) continue
+        allMetrics.add(m.id)
+        metricSums[m.id] = r.result
+        if (r.steps) metricSteps[m.id] = r.steps
       }
 
-      const allMetrics = new Set<string>()
-      const groupResults: any[] = []
+      groupResults.push({ key, count: g.rows.length, sums: metricSums, steps: metricSteps })
+    }
 
-      for (const [key, g] of groups) {
-        const counterSums: Record<string, number> = {}
-        for (const ri of g.rows) {
-          const row = rows[ri]
-          for (const id of allCounterIds) {
-            const colIdx = headers.findIndex((h: string) => h.startsWith(id + ':') || h === id)
-            const v = colIdx >= 0 ? parseFloat(String(row[colIdx] ?? '').replace(/,/g, '')) || 0 : 0
-            counterSums[id] = (counterSums[id] || 0) + v
-          }
-        }
-
-        const metricSums: Record<string, number> = {}
-        const metricSteps: Record<string, string[]> = {}
-        for (const m of metrics) {
-          if (!m.formula) continue
-          const r = evaluateFormulaWithValues(m.formula, counterSums)
-          if (!r || r.result === null || r.error) continue
-          allMetrics.add(m.id)
-          metricSums[m.id] = r.result
-          if (r.steps) metricSteps[m.id] = r.steps
-        }
-
-        groupResults.push({ key, count: g.rows.length, sums: metricSums, steps: metricSteps })
-      }
-
-      const metricIds = Array.from(allMetrics)
-      const data = groupResults.map(g => {
-        const obj: Record<string, any> = { key: g.key, count: g.count, steps: g.steps }
-        metricIds.forEach(id => {
-          obj[`sum_${id}`] = g.sums[id] ?? null
-        })
-        return obj
+    const metricIds = Array.from(allMetrics)
+    const data = groupResults.map(g => {
+      const obj: Record<string, any> = { key: g.key, count: g.count, steps: g.steps }
+      metricIds.forEach(id => {
+        obj[`sum_${id}`] = g.sums[id] ?? null
       })
+      return obj
+    })
 
-      setDimResult({ metricIds, data })
-      setResults([])
-      setLoading(false)
-    }, 50)
+    setDimResult({ metricIds, data })
+    setResults([])
   }
 
   const dimColumns = useMemo(() => {
@@ -172,7 +177,7 @@ export default function CalcGrid() {
     if (!results.length || rowIndex === null) return []
     const row = rows[rowIndex]
     const obj: Record<string, any> = {
-      rowInfo: `${row?.[5] || ''} - ${row?.[10] || ''}`,
+      rowInfo: getRowLabel(row),
       errors: {},
     }
     results.forEach(r => {
@@ -180,7 +185,7 @@ export default function CalcGrid() {
       if (r.error) obj.errors[r.id] = true
     })
     return [obj]
-  }, [results, rowIndex, rows])
+  }, [results, rowIndex, rows, labelColA, labelColB])
 
   const handleExport = () => {
     const exportData = mode === 'none' ? singleTableData : dimResult.data
@@ -239,7 +244,7 @@ export default function CalcGrid() {
               <select value={rowIndex ?? ''} onChange={e => setRowIndex(e.target.value ? Number(e.target.value) : null)}
                 className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
                 <option value="">选择数据行...</option>
-                {rows.map((r, i) => <option key={i} value={i}>{r[5] || ''} - {r[10] || ''}</option>)}
+                {rows.map((r, i) => <option key={i} value={i}>{getRowLabel(r)}</option>)}
               </select>
             </div>
           ) : (

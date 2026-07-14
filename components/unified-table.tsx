@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Inbox } from 'lucide-react'
 
 export interface Column<T = any> {
   key: string
@@ -10,6 +10,7 @@ export interface Column<T = any> {
   align?: 'left' | 'right' | 'center'
   render?: (value: any, row: T, rowIndex: number) => React.ReactNode
   sortable?: boolean
+  cellClassName?: string
 }
 
 interface UnifiedTableProps<T = any> {
@@ -27,6 +28,7 @@ interface UnifiedTableProps<T = any> {
   onRowClick?: (row: T, index: number) => void
   toolbar?: React.ReactNode
   className?: string
+  stickyFirstColumn?: boolean
 }
 
 export default function UnifiedTable<T = any>({
@@ -44,12 +46,16 @@ export default function UnifiedTable<T = any>({
   onRowClick,
   toolbar,
   className = '',
+  stickyFirstColumn = false,
 }: UnifiedTableProps<T>) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(pageSize)
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  const columnsKey = columns.map(c => c.key).join(',')
+  const searchKeysKey = searchKeys?.join(',')
 
   const filtered = useMemo(() => {
     let result = [...data]
@@ -78,7 +84,7 @@ export default function UnifiedTable<T = any>({
       })
     }
     return result
-  }, [data, search, searchable, searchKeys, columns, sortKey, sortDir])
+  }, [data, search, searchable, searchKeysKey, columnsKey, sortKey, sortDir])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / size))
   const safePage = Math.min(page, totalPages)
@@ -118,7 +124,7 @@ export default function UnifiedTable<T = any>({
                   placeholder="搜索数据..."
                   value={search}
                   onChange={e => { setSearch(e.target.value); setPage(1) }}
-                  className="pl-9 pr-3 py-2 w-64 rounded-lg border border-[hsl(var(--border))] text-sm outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] transition-colors"
+                  className="pl-9 pr-3 py-2 w-full sm:w-64 rounded-lg border border-[hsl(var(--border))] text-sm outline-none focus:border-[hsl(var(--primary))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] transition-colors"
                 />
               </div>
             )}
@@ -133,39 +139,43 @@ export default function UnifiedTable<T = any>({
       )}
 
       {/* Table */}
-      <div className="overflow-auto max-h-[calc(100vh-340px)]">
+      <div className="overflow-auto max-h-[60vh]">
         <table className="w-full border-collapse">
           <thead className="bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))]">
             <tr>
-              {columns.map(col => (
-                <th
-                  key={col.key}
-                  onClick={() => handleSort(col.key)}
-                  className={`px-4 py-3 text-left text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider whitespace-nowrap select-none ${
-                    col.sortable ? 'cursor-pointer hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--border))] transition-colors' : ''
-                  }`}
-                  style={{ width: col.width, textAlign: col.align || 'left' }}
-                >
-                  <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : ''}`}>
-                    {col.title}
-                    {col.sortable && (
-                      <span className="text-[hsl(var(--muted-foreground))]">
-                        {sortKey === col.key ? (
-                          sortDir === 'asc' ? <ArrowUp className="w-3 h-3 text-[hsl(var(--primary))]" /> : <ArrowDown className="w-3 h-3 text-[hsl(var(--primary))]" />
-                        ) : (
-                          <ArrowUpDown className="w-3 h-3 opacity-30" />
-                        )}
-                      </span>
-                    )}
-                  </div>
-                </th>
-              ))}
+              {columns.map((col, ci) => {
+                const isSticky = stickyFirstColumn && ci === 0
+                return (
+                  <th
+                    key={col.key}
+                    onClick={() => handleSort(col.key)}
+                    className={`px-4 py-3 text-left text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider whitespace-nowrap select-none ${
+                      col.sortable ? 'cursor-pointer hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--border))] transition-colors' : ''
+                    } ${isSticky ? 'sticky left-0 z-20 bg-[hsl(var(--muted))] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]' : ''}`}
+                    style={{ width: col.width, textAlign: col.align || 'left' }}
+                  >
+                    <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : ''}`}>
+                      {col.title}
+                      {col.sortable && (
+                        <span className="text-[hsl(var(--muted-foreground))]">
+                          {sortKey === col.key ? (
+                            sortDir === 'asc' ? <ArrowUp className="w-3 h-3 text-[hsl(var(--primary))]" /> : <ArrowDown className="w-3 h-3 text-[hsl(var(--primary))]" />
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 opacity-30" />
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-[hsl(var(--border))]">
             {paged.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-12 text-center text-[hsl(var(--muted-foreground))]">
+                  <Inbox className="w-10 h-10 mx-auto mb-2 opacity-40" />
                   {emptyText}
                 </td>
               </tr>
@@ -178,13 +188,16 @@ export default function UnifiedTable<T = any>({
                     onRowClick ? 'cursor-pointer' : ''
                   } ${rowClassName ? rowClassName(row, ri) : ''}`}
                 >
-                  {columns.map(col => {
+                  {columns.map((col, ci) => {
                     const raw = (row as any)[col.key]
                     const content = col.render ? col.render(raw, row, ri) : raw ?? ''
+                    const isSticky = stickyFirstColumn && ci === 0
                     return (
                       <td
                         key={col.key}
-                        className="px-4 py-3 text-sm text-[hsl(var(--foreground))] whitespace-nowrap truncate max-w-[300px]"
+                        className={`px-4 py-3 text-sm text-[hsl(var(--foreground))] whitespace-nowrap truncate max-w-[300px] ${
+                          col.cellClassName || ''
+                        } ${isSticky ? 'sticky left-0 z-10 bg-[hsl(var(--card))] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
                         style={{ textAlign: col.align || 'left' }}
                         title={String(raw ?? '')}
                       >

@@ -129,10 +129,13 @@ export default function DataVizPage() {
         setProcessing(false)
         return
       }
+      const parsedNumericHeaders = headers.filter(h =>
+        rows.some(row => typeof row[h] === 'number' || !isNaN(parseFloat(String(row[h]))))
+      )
       setHeaders(headers)
       setData(rows)
       setXAxis(headers[0])
-      setYAxis(numericHeaders[0] || headers[1] || headers[0])
+      setYAxis(parsedNumericHeaders[0] || headers[1] || headers[0])
       setConfig(prev => ({ ...prev, title: `${headers[1] || ''} 按 ${headers[0]} 分布` }))
       addLog(`读取 ${file.name}：${rows.length} 行 × ${headers.length} 列`)
       if (rows.length >= 5000) addLog('数据量超过5000行，已截断显示')
@@ -140,7 +143,7 @@ export default function DataVizPage() {
       addLog(`读取失败：${e.message}`)
     }
     setProcessing(false)
-  }, [parseCsv, addLog, numericHeaders])
+  }, [parseCsv, addLog])
 
   const chartData = useMemo(() => {
     if (!data.length || !xAxis || !yAxis) return null
@@ -192,9 +195,45 @@ export default function DataVizPage() {
     addLog('图表已导出为 SVG')
   }, [chartType, addLog])
 
+  const handleExportPng = useCallback(() => {
+    const svg = document.querySelector('#viz-chart svg') as SVGSVGElement | null
+    if (!svg) { addLog('暂无图表可导出'); return }
+    const serializer = new XMLSerializer()
+    const source = serializer.serializeToString(svg)
+    const svgBlob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(svgBlob)
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = config.width * 2
+      canvas.height = config.height * 2
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { URL.revokeObjectURL(url); return }
+      ctx.fillStyle = 'white'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      canvas.toBlob((blob) => {
+        if (!blob) return
+        const pngUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = pngUrl
+        a.download = `chart_${chartType}_${Date.now()}.png`
+        a.click()
+        URL.revokeObjectURL(pngUrl)
+      })
+      URL.revokeObjectURL(url)
+    }
+    img.src = url
+    addLog('图表已导出为 PNG')
+  }, [chartType, config.width, config.height, addLog])
+
   const maxVal = useMemo(() => {
     if (!chartData) return 0
-    return Math.max(...chartData.datasets.flatMap(d => d.data))
+    const allData = chartData.datasets.flatMap(d => d.data)
+    if (!allData.length) return 0
+    const max = allData.reduce((a, b) => Math.max(a, b), -Infinity)
+    const min = allData.reduce((a, b) => Math.min(a, b), Infinity)
+    return Math.max(Math.abs(max), Math.abs(min), 0)
   }, [chartData])
 
   const colors = colorSchemes[config.colorScheme] || colorSchemes.default
@@ -394,9 +433,14 @@ export default function DataVizPage() {
                 <div className="bg-[hsl(var(--muted))] rounded-xl border border-[hsl(var(--border))] p-4">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-semibold text-[hsl(var(--foreground))]">{config.title || `${yAxis} 按 ${xAxis} 分布`}</h3>
-                    <button onClick={handleExportChart} className="text-xs text-[hsl(var(--primary))] hover:underline flex items-center gap-1">
-                      <Download className="w-3 h-3" /> 导出SVG
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button onClick={handleExportPng} className="text-xs text-[hsl(var(--primary))] hover:underline flex items-center gap-1">
+                        <Download className="w-3 h-3" /> 导出PNG
+                      </button>
+                      <button onClick={handleExportChart} className="text-xs text-[hsl(var(--primary))] hover:underline flex items-center gap-1">
+                        <Download className="w-3 h-3" /> 导出SVG
+                      </button>
+                    </div>
                   </div>
                   <div id="viz-chart" className="w-full overflow-x-auto">
                     <SvgChart type={chartType} data={chartData} colors={colors} maxVal={maxVal} config={config} />
@@ -472,10 +516,35 @@ function SvgChart({ type, data, colors, maxVal, config }: { type: ChartType; dat
 
   if (type === 'pie') {
     const total = datasets[0].data.reduce((a: number, b: number) => a + b, 0)
-    let startAngle = 0
+    if (total === 0) return null
+    let curAngle = 0
     const cx = padding.left + chartW / 2
     const cy = padding.top + chartH / 2
     const r = Math.min(chartW, chartH) / 2 - 20
+
+    const slices = datasets[0].data.map((val: number, i: number) => {
+      const angle = (val / total) * 2 * Math.PI
+      const startA = curAngle
+      const endA = curAngle + angle
+      const midA = startA + angle / 2
+      curAngle = endA
+      return {
+        idx: i, val, midA,
+        x1: cx + r * Math.cos(startA), y1: cy + r * Math.sin(startA),
+        x2: cx + r * Math.cos(endA), y2: cy + r * Math.sin(endA),
+        largeArc: angle > Math.PI ? 1 : 0,
+        tx: cx + (r * 0.7) * Math.cos(midA), ty: cy + (r * 0.7) * Math.sin(midA),
+        labelX: cx + (r + 35) * Math.cos(midA), labelY: cy + (r + 35) * Math.sin(midA),
+      }
+    })
+
+    for (let i = 1; i < slices.length; i++) {
+      const prev = slices[i - 1]
+      const curr = slices[i]
+      if (Math.abs(curr.labelY - prev.labelY) < 14 && Math.abs(curr.labelX - prev.labelX) < 60) {
+        curr.labelY = prev.labelY + (i % 2 === 0 ? 16 : -16)
+      }
+    }
 
     return (
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ maxWidth: width }}>
@@ -484,31 +553,18 @@ function SvgChart({ type, data, colors, maxVal, config }: { type: ChartType; dat
             {config.title}
           </text>
         )}
-        {datasets[0].data.map((val: number, i: number) => {
-          const angle = (val / total) * 2 * Math.PI
-          const endAngle = startAngle + angle
-          const x1 = cx + r * Math.cos(startAngle)
-          const y1 = cy + r * Math.sin(startAngle)
-          const x2 = cx + r * Math.cos(endAngle)
-          const y2 = cy + r * Math.sin(endAngle)
-          const largeArc = angle > Math.PI ? 1 : 0
-          const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`
-          const midAngle = startAngle + angle / 2
-          const tx = cx + (r * 0.7) * Math.cos(midAngle)
-          const ty = cy + (r * 0.7) * Math.sin(midAngle)
-          const labelX = cx + (r + 35) * Math.cos(midAngle)
-          const labelY = cy + (r + 35) * Math.sin(midAngle)
-          startAngle = endAngle
+        {slices.map(s => {
+          const d = `M ${cx} ${cy} L ${s.x1} ${s.y1} A ${r} ${r} 0 ${s.largeArc} 1 ${s.x2} ${s.y2} Z`
           return (
-            <g key={i}>
-              <path d={d} fill={colors[i % colors.length]} stroke="white" strokeWidth={2} />
+            <g key={s.idx}>
+              <path d={d} fill={colors[s.idx % colors.length]} stroke="white" strokeWidth={2} />
               {config.showLabels && (
-                <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={11} fontWeight={600}>
-                  {((val / total) * 100).toFixed(1)}%
+                <text x={s.tx} y={s.ty} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={11} fontWeight={600}>
+                  {((s.val / total) * 100).toFixed(1)}%
                 </text>
               )}
-              <text x={labelX} y={labelY} textAnchor={midAngle > Math.PI ? 'end' : 'start'} dominantBaseline="middle" fill="currentColor" fontSize={10}>
-                {labels[i]}
+              <text x={s.labelX} y={s.labelY} textAnchor={s.midA > Math.PI ? 'end' : 'start'} dominantBaseline="middle" fill="currentColor" fontSize={10}>
+                {labels[s.idx]}
               </text>
             </g>
           )

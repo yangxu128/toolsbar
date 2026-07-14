@@ -27,24 +27,31 @@ export default function RegexTesterPage() {
   const [replaceStr, setReplaceStr] = useState('')
   const [mode, setMode] = useState<'match' | 'replace' | 'split'>('match')
   const [copied, setCopied] = useState(false)
+  const [copiedRegex, setCopiedRegex] = useState(false)
+
+  const flagError = useMemo(() => {
+    const valid = 'gimsuyd'
+    const invalid = flags.split('').filter(f => !valid.includes(f))
+    return invalid.length ? `不支持的标志位: ${invalid.join(', ')}` : ''
+  }, [flags])
 
   const regex = useMemo(() => {
-    if (!pattern) return null
+    if (!pattern || flagError) return null
     try { return new RegExp(pattern, flags) } catch { return null }
-  }, [pattern, flags])
+  }, [pattern, flags, flagError])
 
   const matches = useMemo(() => {
     if (!regex || !testStr) return []
-    const results: { match: string; index: number; groups?: Record<string, string> }[] = []
+    const results: { match: string; index: number; groups?: Record<string, string>; captures?: string[] }[] = []
     if (flags.includes('g')) {
       let m
       while ((m = regex.exec(testStr)) !== null) {
-        results.push({ match: m[0], index: m.index, groups: m.groups })
+        results.push({ match: m[0], index: m.index, groups: m.groups, captures: m.slice(1) })
         if (!m[0]) regex.lastIndex++
       }
     } else {
       const m = regex.exec(testStr)
-      if (m) results.push({ match: m[0], index: m.index, groups: m.groups })
+      if (m) results.push({ match: m[0], index: m.index, groups: m.groups, captures: m.slice(1) })
     }
     return results
   }, [regex, testStr, flags])
@@ -56,8 +63,8 @@ export default function RegexTesterPage() {
     return ''
   }, [regex, testStr, mode, replaceStr])
 
-  const highlighted = useMemo(() => {
-    if (!regex || !testStr || matches.length === 0) return testStr
+  const highlighted = useMemo<{ text: string; isMatch: boolean }[]>(() => {
+    if (!regex || !testStr || matches.length === 0) return [{ text: testStr, isMatch: false }]
     const parts: { text: string; isMatch: boolean }[] = []
     let lastIdx = 0
     for (const m of matches) {
@@ -80,6 +87,13 @@ export default function RegexTesterPage() {
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }, [mode, matches, result])
+
+  const copyRegex = useCallback(() => {
+    if (!pattern) return
+    navigator.clipboard.writeText(`/${pattern}/${flags}`)
+    setCopiedRegex(true)
+    setTimeout(() => setCopiedRegex(false), 1500)
+  }, [pattern, flags])
 
   return (
     <div className="animate-fade-in-up">
@@ -112,7 +126,13 @@ export default function RegexTesterPage() {
             <span className="text-cyan-500 font-mono text-lg">/</span>
             <input type="text" value={flags} onChange={e => setFlags(e.target.value)} placeholder="flags"
               className="form-input w-16 px-2 text-sm font-mono text-center" />
+            <button onClick={copyRegex} className="copy-btn hover:text-cyan-500 whitespace-nowrap">
+              {copiedRegex ? <><Check className="w-3 h-3" />已复制</> : <><Copy className="w-3 h-3" />复制正则</>}
+            </button>
           </div>
+          {flagError && (
+            <div className="text-xs text-red-500 mb-2">{flagError}</div>
+          )}
 
           {/* 标志位 */}
           <div className="flex flex-wrap gap-2 mb-4">
@@ -127,7 +147,7 @@ export default function RegexTesterPage() {
           {/* 预设 */}
           <div className="flex flex-wrap gap-1.5 mb-4">
             {presets.map(p => (
-              <button key={p.name} onClick={() => { setPattern(p.pattern.source); setFlags('g') }}
+              <button key={p.name} onClick={() => { setPattern(p.pattern.source); setFlags(p.pattern.flags || 'g') }}
                 className="tab-pill text-[10px] py-1 px-2 hover:text-cyan-600">
                 {p.name}
               </button>
@@ -156,7 +176,7 @@ export default function RegexTesterPage() {
             <div className="result-card mb-4">
               <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">匹配高亮</label>
               <div className="text-sm font-mono break-all leading-relaxed">
-                {typeof highlighted === 'string' ? highlighted : (highlighted as { text: string; isMatch: boolean }[]).map((part, i) =>
+                {highlighted.map((part, i) =>
                   part.isMatch
                     ? <mark key={i} className="bg-cyan-200 dark:bg-cyan-800 text-[hsl(var(--foreground))] rounded px-0.5">{part.text}</mark>
                     : <span key={i}>{part.text}</span>
@@ -191,7 +211,6 @@ export default function RegexTesterPage() {
                     <div key={i} className="text-xs font-mono flex items-center gap-2">
                       <span className="text-[hsl(var(--muted-foreground))]">[{m.index}]</span>
                       <span className="text-cyan-600 dark:text-cyan-400">{m.match}</span>
-                      {m.groups && <span className="text-[hsl(var(--muted-foreground))]">{JSON.stringify(m.groups)}</span>}
                     </div>
                   ))}
                 </div>
@@ -201,10 +220,33 @@ export default function RegexTesterPage() {
             </div>
           )}
 
+          {/* 捕获组 */}
+          {mode === 'match' && matches.some(m => (m.captures && m.captures.length > 0) || m.groups) && (
+            <div className="result-card mb-4">
+              <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">捕获组</label>
+              <div className="space-y-1">
+                {matches.map((m, i) => {
+                  if (!m.captures?.length && !m.groups) return null
+                  return (
+                    <div key={i} className="text-xs font-mono flex flex-wrap items-center gap-2">
+                      <span className="text-[hsl(var(--muted-foreground))]">[{i}]</span>
+                      {m.captures?.map((c, ci) => (
+                        <span key={ci}><span className="text-cyan-600 dark:text-cyan-400">${ci + 1}</span>: <span className="text-[hsl(var(--foreground))]">{c || '(空)'}</span></span>
+                      ))}
+                      {m.groups && Object.entries(m.groups).map(([k, v]) => (
+                        <span key={k}><span className="text-cyan-600 dark:text-cyan-400">{k}</span>: <span className="text-[hsl(var(--foreground))]">{v || '(空)'}</span></span>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* 正则错误 */}
           {pattern && !regex && (
             <div className="error-state mb-4">
-              正则表达式语法错误
+              {flagError || '正则表达式语法错误'}
             </div>
           )}
 

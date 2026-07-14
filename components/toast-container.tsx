@@ -22,13 +22,13 @@ export default function ToastContainer() {
   if (!toasts.length) return null
 
   return (
-    <div className="fixed top-20 right-4 z-[100] flex flex-col gap-3 pointer-events-none">
+    <div className="fixed top-20 right-2 left-2 sm:left-auto sm:right-4 z-[100] flex flex-col gap-3 pointer-events-none">
       {toasts.map((toast) => {
-        const Icon = icons[toast.type]
+        const Icon = icons[toast.type as keyof typeof icons] || Info
         return (
           <div
             key={toast.id}
-            className={`animate-slide-in-right pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium relative overflow-hidden min-w-[280px] max-w-sm ${styles[toast.type]}`}
+            className={`animate-slide-in-right pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium relative overflow-hidden w-full sm:w-auto min-w-0 sm:min-w-[280px] max-w-sm ${styles[toast.type as keyof typeof styles] || ''}`}
           >
             <Icon className="w-5 h-5 shrink-0" />
             <span className="flex-1">{toast.message}</span>

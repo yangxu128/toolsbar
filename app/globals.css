@@ -52,6 +52,8 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
 }
 
 .font-mono {
@@ -70,10 +72,15 @@ body {
   border-radius: 1rem;
   border: 1px solid hsl(var(--border));
   padding: 1.5rem;
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease, border-color 0.25s ease;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease, border-color 0.25s ease, opacity 0.3s ease;
   cursor: pointer;
   position: relative;
   overflow: hidden;
+}
+.tool-card.exiting {
+  opacity: 0;
+  transform: scale(0.9);
+  pointer-events: none;
 }
 .tool-card::before {
   content: '';
@@ -164,8 +171,7 @@ body {
   box-shadow: 0 4px 14px -4px hsl(var(--primary) / 0.45);
 }
 .filter-chip.active:hover {
-  background: hsl(221 83% 47%);
-  border-color: hsl(221 83% 47%);
+  filter: brightness(0.92);
   transform: translateY(-1px);
 }
 
@@ -303,22 +309,6 @@ kbd {
   50% { transform: translateY(-6px); }
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes pulse-ring {
-  0% { transform: scale(0.8); opacity: 0.6; }
-  100% { transform: scale(1.4); opacity: 0; }
-}
-
-@keyframes press {
-  0% { transform: scale(1); }
-  40% { transform: scale(0.96); }
-  100% { transform: scale(1); }
-}
-
 .animate-fade-in-up {
   animation: fadeInUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   opacity: 0;
@@ -350,25 +340,6 @@ kbd {
 
 .animate-float {
   animation: float 3s ease-in-out infinite;
-}
-
-.animate-shimmer {
-  background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--muted-foreground) / 0.15) 50%, hsl(var(--muted)) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-.animate-pulse-ring::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: 0 0 0 0 hsl(var(--primary) / 0.35);
-  animation: pulse-ring 1.8s ease-out infinite;
-}
-
-.animate-press:active {
-  animation: press 0.2s ease-out;
 }
 
 .form-input {

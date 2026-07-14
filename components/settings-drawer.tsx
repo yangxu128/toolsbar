@@ -11,6 +11,8 @@ import { useXmlStore } from '@/lib/xml-store'
 import { useFavStore } from '@/lib/fav-store'
 import { useToastStore } from '@/lib/toast-store'
 
+const APP_VERSION = '2.0.0'
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -45,6 +47,10 @@ export default function SettingsDrawer({ open, onClose }: Props) {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target?.result as string)
+        if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+          addToast('导入失败，数据格式不是对象', 'error')
+          return
+        }
         if (data.kpi) localStorage.setItem('kpi-storage', JSON.stringify(data.kpi))
         if (data.xml) localStorage.setItem('xml-storage', JSON.stringify(data.xml))
         if (data.fav) localStorage.setItem('fav-storage', JSON.stringify(data.fav))
@@ -68,12 +74,15 @@ export default function SettingsDrawer({ open, onClose }: Props) {
     setTimeout(() => window.location.reload(), 500)
   }
 
-  if (!open) return null
-
   return (
     <>
-      <div className="fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed top-0 right-0 bottom-0 z-[70] w-full max-w-md bg-[hsl(var(--card))] border-l border-[hsl(var(--border))] animate-slide-in-right overflow-auto">
+      <div
+        className={`fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={onClose}
+      />
+      <div
+        className={`fixed top-0 right-0 bottom-0 z-[70] w-full max-w-md bg-[hsl(var(--card))] border-l border-[hsl(var(--border))] overflow-auto transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+      >
         <div className="flex items-center justify-between p-6 border-b border-[hsl(var(--border))]">
           <h2 className="text-lg font-bold text-[hsl(var(--foreground))] flex items-center gap-2">
             <Settings className="w-5 h-5 text-[hsl(var(--primary))]" />配置管理中心
@@ -104,7 +113,10 @@ export default function SettingsDrawer({ open, onClose }: Props) {
                 <span className="text-xs font-medium">深色</span>
               </button>
               <button
-                onClick={() => setTheme('dark')}
+                onClick={() => {
+                  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+                  setTheme(prefersDark ? 'dark' : 'light')
+                }}
                 className="p-3 rounded-xl border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))] transition-all text-center"
               >
                 <Monitor className="w-5 h-5 mx-auto mb-1 text-[hsl(var(--muted-foreground))]" />
@@ -167,7 +179,7 @@ export default function SettingsDrawer({ open, onClose }: Props) {
               <Info className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />关于
             </h3>
             <div className="p-4 rounded-xl bg-[hsl(var(--muted))] text-xs text-[hsl(var(--muted-foreground))] leading-relaxed space-y-1">
-              <p>uanx v1.0.0</p>
+              <p>uanx v{APP_VERSION}</p>
               <p>纯前端架构 · 本地 IndexedDB 存储</p>
               <p>所有数据处理均在浏览器本地完成</p>
             </div>

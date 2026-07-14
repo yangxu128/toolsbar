@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { Palette, Home, Star, ChevronRight as ChevronRightIcon, Copy, Check } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
 function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace('#', '')
+  let h = hex.replace('#', '')
+  if (h.length === 3) h = h.split('').map(c => c + c).join('')
   return [parseInt(h.substring(0, 2), 16), parseInt(h.substring(2, 4), 16), parseInt(h.substring(4, 6), 16)]
 }
 
@@ -66,6 +67,14 @@ function contrastRatio(hex1: string, hex2: string): number {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
+function CopyBtn({ text, label, copied, onCopy }: { text: string; label: string; copied: string | null; onCopy: (text: string, label: string) => void }) {
+  return (
+    <button onClick={() => onCopy(text, label)} className="copy-btn">
+      {copied === label ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+    </button>
+  )
+}
+
 export default function ColorPickerPage() {
   const isFav = useFavStore(s => s.isFav)
   const toggleFav = useFavStore(s => s.toggleFav)
@@ -74,9 +83,26 @@ export default function ColorPickerPage() {
   const [hex, setHex] = useState('#3b82f6')
   const [copied, setCopied] = useState<string | null>(null)
   const [palette, setPalette] = useState<string[]>([])
+  const [history, setHistory] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    try { return JSON.parse(localStorage.getItem('color-history') || '[]') } catch { return [] }
+  })
 
   const [r, g, b] = hexToRgb(hex)
   const [h, s, l] = rgbToHsl(r, g, b)
+
+  const addToHistory = useCallback((color: string) => {
+    setHistory(prev => {
+      const next = [color, ...prev.filter(c => c.toLowerCase() !== color.toLowerCase())].slice(0, 12)
+      try { localStorage.setItem('color-history', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }, [])
+
+  const selectColor = useCallback((c: string) => {
+    setHex(c)
+    addToHistory(c)
+  }, [addToHistory])
 
   const updateFromHsl = useCallback((nh: number, ns: number, nl: number) => {
     const [nr, ng, nb] = hslToRgb(nh, ns, nl)
@@ -95,17 +121,24 @@ export default function ColorPickerPage() {
 
   useEffect(() => { generatePalette() }, [generatePalette])
 
+  const schemes = useMemo(() => {
+    const mk = (nh: number, ns = s, nl = l) => {
+      const [nr, ng, nb] = hslToRgb(((nh % 360) + 360) % 360, ns, nl)
+      return rgbToHex(nr, ng, nb)
+    }
+    return {
+      complementary: mk(h + 180),
+      analogous: [mk(h + 30), mk(h - 30)],
+      triadic: [mk(h + 120), mk(h + 240)],
+    }
+  }, [h, s, l])
+
   const copy = useCallback((text: string, label: string) => {
     navigator.clipboard.writeText(text)
     setCopied(label)
+    if (label === 'hex') addToHistory(text)
     setTimeout(() => setCopied(null), 1500)
-  }, [])
-
-  const CopyBtn = ({ text, label }: { text: string; label: string }) => (
-    <button onClick={() => copy(text, label)} className="copy-btn">
-      {copied === label ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-    </button>
-  )
+  }, [addToHistory])
 
   const ratio = contrastRatio(hex, '#ffffff')
   const ratioBlack = contrastRatio(hex, '#000000')
@@ -147,13 +180,13 @@ export default function ColorPickerPage() {
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] flex items-center justify-between">HEX <CopyBtn text={hex} label="hex" /></label>
-                  <input type="text" value={hex} onChange={e => { if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) setHex(e.target.value) }}
+                  <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] flex items-center justify-between">HEX <CopyBtn text={hex} label="hex" copied={copied} onCopy={copy} /></label>
+                  <input type="text" value={hex} onChange={e => { if (/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(e.target.value)) setHex(e.target.value) }}
                     className="form-input mt-1 text-sm font-mono" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] flex items-center justify-between">
-                    RGB <CopyBtn text={`rgb(${r}, ${g}, ${b})`} label="rgb" />
+                    RGB <CopyBtn text={`rgb(${r}, ${g}, ${b})`} label="rgb" copied={copied} onCopy={copy} />
                   </label>
                   <div className="grid grid-cols-3 gap-2 mt-1">
                     {[['R', r], ['G', g], ['B', b]].map(([ch, val]) => (
@@ -172,7 +205,7 @@ export default function ColorPickerPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] flex items-center justify-between">
-                    HSL <CopyBtn text={`hsl(${h}, ${s}%, ${l}%)`} label="hsl" />
+                    HSL <CopyBtn text={`hsl(${h}, ${s}%, ${l}%)`} label="hsl" copied={copied} onCopy={copy} />
                   </label>
                   <div className="space-y-1 mt-1">
                     <div className="flex items-center gap-2">
@@ -198,7 +231,7 @@ export default function ColorPickerPage() {
                 <h4 className="text-xs font-semibold text-[hsl(var(--foreground))] mb-2">色板</h4>
                 <div className="grid grid-cols-5 gap-1.5">
                   {palette.map((c, i) => (
-                    <button key={i} onClick={() => setHex(c)} className="h-10 rounded-lg border border-[hsl(var(--border))] cursor-pointer hover:scale-105 transition-transform"
+                    <button key={i} onClick={() => selectColor(c)} className="h-10 rounded-lg border border-[hsl(var(--border))] cursor-pointer hover:scale-105 transition-transform"
                       style={{ backgroundColor: c }} title={c} />
                   ))}
                 </div>
@@ -232,6 +265,40 @@ export default function ColorPickerPage() {
                 <h4 className="text-xs font-semibold text-[hsl(var(--foreground))] mb-2">渐变色</h4>
                 <div className="h-10 rounded-lg border border-[hsl(var(--border))]"
                   style={{ background: `linear-gradient(to right, #000000, ${hex}, #ffffff)` }} />
+              </div>
+
+              <div>
+                <h4 className="text-xs font-semibold text-[hsl(var(--foreground))] mb-2">配色方案</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-[hsl(var(--muted-foreground))] w-16 shrink-0">互补色</span>
+                    <button onClick={() => selectColor(schemes.complementary)} className="h-8 flex-1 rounded-lg border border-[hsl(var(--border))] cursor-pointer hover:scale-105 transition-transform" style={{ backgroundColor: schemes.complementary }} title={schemes.complementary} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-[hsl(var(--muted-foreground))] w-16 shrink-0">类似色</span>
+                    {schemes.analogous.map((c, i) => (
+                      <button key={i} onClick={() => selectColor(c)} className="h-8 flex-1 rounded-lg border border-[hsl(var(--border))] cursor-pointer hover:scale-105 transition-transform" style={{ backgroundColor: c }} title={c} />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-[hsl(var(--muted-foreground))] w-16 shrink-0">三角配色</span>
+                    <button onClick={() => selectColor(hex)} className="h-8 flex-1 rounded-lg border border-[hsl(var(--border))] cursor-pointer" style={{ backgroundColor: hex }} title={hex} />
+                    {schemes.triadic.map((c, i) => (
+                      <button key={i} onClick={() => selectColor(c)} className="h-8 flex-1 rounded-lg border border-[hsl(var(--border))] cursor-pointer hover:scale-105 transition-transform" style={{ backgroundColor: c }} title={c} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-semibold text-[hsl(var(--foreground))] mb-2">最近使用</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {history.length === 0 ? (
+                    <span className="text-[10px] text-[hsl(var(--muted-foreground))]">复制颜色或点击色板后会自动记录</span>
+                  ) : history.map((c, i) => (
+                    <button key={i} onClick={() => selectColor(c)} className="w-8 h-8 rounded-lg border border-[hsl(var(--border))] cursor-pointer hover:scale-110 transition-transform" style={{ backgroundColor: c }} title={c} />
+                  ))}
+                </div>
               </div>
             </div>
           </div>

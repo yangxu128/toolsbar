@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Calculator, FileCode, BarChart3, Database, Settings2,
   ArrowRight, Wrench, FolderOpen, Star, ShieldCheck,
@@ -201,11 +201,13 @@ function useCountUp(target: number, duration = 1500) {
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState('all')
   const [animatingFav, setAnimatingFav] = useState<string | null>(null)
+  const [exitingIds, setExitingIds] = useState<Set<string>>(new Set())
   const favorites = useFavStore((s) => s.favorites)
   const toggleFav = useFavStore((s) => s.toggleFav)
   const isFav = useFavStore((s) => s.isFav)
   const searchQuery = useSearchStore((s) => s.query)
   const setSearchGlobal = useSearchStore((s) => s.setQuery)
+  const router = useRouter()
 
   const availableTools = tools.filter((t) => t.available)
   const categorySet = new Set(availableTools.map((t) => t.category))
@@ -236,9 +238,23 @@ export default function Home() {
   const handleFavClick = (e: React.MouseEvent, id: string) => {
     e.preventDefault()
     e.stopPropagation()
-    setAnimatingFav(id)
-    toggleFav(id)
-    setTimeout(() => setAnimatingFav(null), 500)
+    if (isFav(id) && activeCategory === 'fav') {
+      setExitingIds((prev) => new Set(prev).add(id))
+      setAnimatingFav(id)
+      setTimeout(() => {
+        toggleFav(id)
+        setAnimatingFav(null)
+        setExitingIds((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      }, 300)
+    } else {
+      setAnimatingFav(id)
+      toggleFav(id)
+      setTimeout(() => setAnimatingFav(null), 500)
+    }
   }
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -317,6 +333,7 @@ export default function Home() {
             <button
               key={cat.key}
               onClick={() => setActiveCategory(cat.key)}
+              aria-pressed={activeCategory === cat.key}
               className={`filter-chip ${activeCategory === cat.key ? 'active' : ''}`}
             >
               <Icon className={`w-3.5 h-3.5 transition-transform duration-300 ${activeCategory === cat.key ? 'scale-110' : ''}`} />
@@ -352,7 +369,7 @@ export default function Home() {
             const card = (
               <div
                 onMouseMove={handleMouseMove}
-                className={`tool-card ${comingSoon ? 'coming-soon' : ''} animate-fade-in-up stagger-${stagger}`}
+                className={`tool-card ${comingSoon ? 'coming-soon' : ''} ${exitingIds.has(tool.id) ? 'exiting' : ''} animate-fade-in-up stagger-${stagger}`}
               >
                 {comingSoon ? (
                   <div className="absolute top-3 right-3">
@@ -400,9 +417,9 @@ export default function Home() {
             )
 
             return comingSoon ? (
-              <div key={tool.id}>{card}</div>
+              <div key={tool.id} onClick={(e) => e.preventDefault()}>{card}</div>
             ) : (
-              <Link key={tool.id} href={tool.path} className="group block">{card}</Link>
+              <div key={tool.id} onClick={() => router.push(tool.path)} className="group block cursor-pointer">{card}</div>
             )
           })}
         </section>

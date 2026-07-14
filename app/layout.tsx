@@ -16,14 +16,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const [pageKey, setPageKey] = useState(pathname)
   const searchQuery = useSearchStore((s) => s.query)
   const setSearchQuery = useSearchStore((s) => s.setQuery)
   const desktopInputRef = useRef<HTMLInputElement>(null)
   const mobileInputRef = useRef<HTMLInputElement>(null)
+  const mainRef = useRef<HTMLElement>(null)
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
 
   useEffect(() => {
-    setPageKey(pathname)
+    if (mainRef.current) {
+      mainRef.current.classList.remove('animate-fade-in')
+      void mainRef.current.offsetWidth
+      mainRef.current.classList.add('animate-fade-in')
+    }
   }, [pathname])
 
   useEffect(() => {
@@ -82,18 +87,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <input
                 ref={desktopInputRef}
                 type="text"
+                aria-label="搜索工具"
                 placeholder="搜索工具（如：Excel、XML、JSON）..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="search-input"
               />
               <kbd className="hidden lg:inline-flex absolute right-3 top-1/2 -translate-y-1/2 items-center gap-1">
-                <span>⌘</span><span>K</span>
+                <span>{isMac ? '⌘' : 'Ctrl'}</span><span>K</span>
               </kbd>
             </div>
 
             <div className="flex items-center gap-1">
-              <button onClick={toggleTheme} className="icon-btn" title="切换主题">
+              <button onClick={toggleTheme} className="icon-btn" aria-label="切换主题" title="切换主题">
                 <Sun className="w-5 h-5 hidden dark:block" />
                 <Moon className="w-5 h-5 block dark:hidden" />
               </button>
@@ -113,6 +119,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <input
               ref={mobileInputRef}
               type="text"
+              aria-label="搜索工具"
               placeholder="搜索工具..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -121,7 +128,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </div>
 
-        <main key={pageKey} className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 animate-fade-in">
+        <main ref={mainRef} className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 animate-fade-in">
           {children}
         </main>
 
@@ -133,7 +140,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span>· 纯前端 · 本地存储 · 隐私无忧</span>
             </div>
             <div className="flex items-center gap-4">
-              <button onClick={() => {}} className="hover:text-[hsl(var(--primary))] transition-colors">导出数据</button>
+              <button onClick={() => setSettingsOpen(true)} className="hover:text-[hsl(var(--primary))] transition-colors">导出数据</button>
               <button onClick={() => setSettingsOpen(true)} className="hover:text-[hsl(var(--primary))] transition-colors">设置</button>
             </div>
           </div>

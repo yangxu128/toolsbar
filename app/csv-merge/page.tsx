@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { FileSpreadsheet, X, Home, Star, ChevronRight as ChevronRightIcon, GitMerge, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { FileSpreadsheet, X, Home, Star, ChevronRight as ChevronRightIcon, GitMerge, CheckCircle2, AlertCircle, Loader2, Ban, Trash2 } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
 type Encoding = 'auto' | 'gbk' | 'utf8' | 'utf8bom'
@@ -23,7 +23,9 @@ export default function CsvMergePage() {
   const [encoding, setEncoding] = useState<Encoding>('utf8bom')
   const [outputEncoding, setOutputEncoding] = useState<Encoding>('utf8bom')
   const [completedGroups, setCompletedGroups] = useState<{ prefix: string; files: string[]; totalRows: number }[]>([])
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cancelRef = useRef(false)
 
   const addLog = useCallback((msg: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`])
@@ -31,19 +33,35 @@ export default function CsvMergePage() {
 
   const readFileWithEncoding = useCallback(async (file: File, enc: Encoding): Promise<string> => {
     const buffer = await file.arrayBuffer()
+    const arr = new Uint8Array(buffer)
     if (enc === 'gbk') return new TextDecoder('gbk').decode(buffer)
     if (enc === 'utf8') return new TextDecoder('utf-8').decode(buffer)
     if (enc === 'utf8bom') {
-      const arr = new Uint8Array(buffer)
       const start = arr.length >= 3 && arr[0] === 0xef && arr[1] === 0xbb && arr[2] === 0xbf ? 3 : 0
       return new TextDecoder('utf-8').decode(arr.slice(start))
     }
+    if (arr.length >= 3 && arr[0] === 0xef && arr[1] === 0xbb && arr[2] === 0xbf) {
+      return new TextDecoder('utf-8').decode(arr.slice(3))
+    }
+    if (arr.length >= 2 && arr[0] === 0xff && arr[1] === 0xfe) {
+      return new TextDecoder('utf-16le').decode(arr.slice(2))
+    }
+    if (arr.length >= 2 && arr[0] === 0xfe && arr[1] === 0xff) {
+      return new TextDecoder('utf-16be').decode(arr.slice(2))
+    }
+    const utf8Decoded = new TextDecoder('utf-8').decode(buffer)
+    let utf8Valid = true
     try {
-      const decoded = new TextDecoder('gbk').decode(buffer)
-      if (/[\u4e00-\u9fa5]/.test(decoded)) return decoded
-      return new TextDecoder('utf-8').decode(buffer)
+      const check = new TextDecoder('utf-8', { fatal: true })
+      check.decode(arr)
     } catch {
-      return new TextDecoder('utf-8').decode(buffer)
+      utf8Valid = false
+    }
+    if (utf8Valid) return utf8Decoded
+    try {
+      return new TextDecoder('gbk').decode(buffer)
+    } catch {
+      return utf8Decoded
     }
   }, [])
 
@@ -75,10 +93,17 @@ export default function CsvMergePage() {
     addLog(`已自动下载：${prefix}合并.csv (${totalRows}行)`)
   }, [encodeOutput, outputEncoding, addLog])
 
+  const handleCancel = useCallback(() => {
+    cancelRef.current = true
+    addLog('收到取消请求，将在当前分组完成后停止...')
+  }, [addLog])
+
   const handleUpload = useCallback(async (files: FileList) => {
     setProcessing(true)
+    cancelRef.current = false
     setLogs([])
     setCompletedGroups([])
+    setProgress(null)
     addLog(`已选择 ${files.length} 个文件，编码：${encLabels[encoding]}，开始解析...`)
 
     const fileList = Array.from(files)
@@ -94,10 +119,16 @@ export default function CsvMergePage() {
       fileGroups.get(prefix)!.push({ file, name: file.name })
     }
 
-    addLog(`按文件名前20位分组，共 ${fileGroups.size} 组`)
+    const groupCount = fileGroups.size
+    addLog(`按文件名前20位分组，共 ${groupCount} 组`)
+    setProgress({ current: 0, total: groupCount })
 
+    let groupIndex = 0
     for (const [prefix, fileItems] of fileGroups) {
-      addLog(`处理分组 [${prefix}...]，包含 ${fileItems.length} 个文件`)
+      if (cancelRef.current) { addLog('已取消处理'); break }
+      groupIndex++
+      setProgress({ current: groupIndex, total: groupCount })
+      addLog(`处理分组 [${prefix}...]，包含 ${fileItems.length} 个文件（第 ${groupIndex}/${groupCount} 组）`)
 
       let mergedHeaders: string[] = []
       const mergedLines: string[] = []
@@ -109,33 +140,14 @@ export default function CsvMergePage() {
           const lines = text.split(/\r?\n/)
           if (lines.length === 0) { addLog(`文件 ${name} 无有效数据`); continue }
 
-          const parseLine = (line: string): string[] => {
-            const result: string[] = []
-            let current = ''
-            let inQuotes = false
-            for (let i = 0; i < line.length; i++) {
-              const ch = line[i]
-              if (inQuotes) {
-                if (ch === '"' && line[i + 1] === '"') { current += '"'; i++ }
-                else if (ch === '"') inQuotes = false
-                else current += ch
-              } else {
-                if (ch === '"') inQuotes = true
-                else if (ch === ',') { result.push(current); current = '' }
-                else current += ch
-              }
-            }
-            result.push(current)
-            return result
-          }
-
           const headers = parseLine(lines[0])
           if (headers.length === 0) { addLog(`文件 ${name} 无有效表头`); continue }
           if (mergedHeaders.length === 0) mergedHeaders = headers
 
           for (let i = 1; i < lines.length; i++) {
-            if (lines[i].trim().length === 0) continue
-            mergedLines.push(lines[i])
+            const line = lines[i]
+            if (line.length === 0 || line.charCodeAt(0) === 13) continue
+            mergedLines.push(line)
             totalRows++
           }
           addLog(`读取 ${name}：${lines.length - 1} 行`)
@@ -152,7 +164,8 @@ export default function CsvMergePage() {
     }
 
     setProcessing(false)
-    addLog('全部处理完成')
+    setProgress(null)
+    addLog(cancelRef.current ? '处理已取消' : '全部处理完成')
   }, [addLog, readFileWithEncoding, encoding, downloadMerged])
 
   return (
@@ -217,11 +230,17 @@ export default function CsvMergePage() {
                 {processing ? '正在合并文件...' : '拖拽多个 CSV 文件到此处'}
               </h3>
               <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
-                {processing ? '合并完成后自动下载，请勿关闭页面' : '支持多选，按文件名前20位自动分组合并'}
+                {processing
+                  ? (progress ? `正在处理第 ${progress.current}/${progress.total} 组，合并完成后自动下载` : '合并完成后自动下载，请勿关闭页面')
+                  : '支持多选，按文件名前20位自动分组合并'}
               </p>
-              {!processing && (
+              {!processing ? (
                 <button className="btn-primary bg-teal-500 hover:bg-teal-600">
                   选择文件
+                </button>
+              ) : (
+                <button onClick={handleCancel} className="btn-primary bg-red-500 hover:bg-red-600 inline-flex items-center justify-center gap-2">
+                  <Ban className="w-4 h-4" /> 取消处理
                 </button>
               )}
             </div>
@@ -263,13 +282,21 @@ export default function CsvMergePage() {
           </div>
 
           {logs.length > 0 && (
-            <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] max-h-48 overflow-y-auto animate-scale-in">
-              {logs.map((log, i) => (
-                <div key={i} className="text-xs text-[hsl(var(--muted-foreground))] font-mono py-0.5 flex items-start gap-1.5">
-                  {log.includes('失败') ? <AlertCircle className="w-3 h-3 text-red-400 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />}
-                  {log}
-                </div>
-              ))}
+            <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] animate-scale-in">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">处理日志</h4>
+                <button onClick={() => setLogs([])} className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" /> 清空日志
+                </button>
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                {logs.map((log, i) => (
+                  <div key={i} className="text-xs text-[hsl(var(--muted-foreground))] font-mono py-0.5 flex items-start gap-1.5">
+                    {log.includes('失败') || log.includes('取消') ? <AlertCircle className="w-3 h-3 text-red-400 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />}
+                    {log}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -288,6 +315,52 @@ function gbkEncode(str: string): Uint8Array {
     bytes.push(enc >> 8, enc & 0xff)
   }
   return new Uint8Array(bytes)
+}
+
+function parseLine(line: string): string[] {
+  if (line.indexOf('"') === -1) {
+    return line.split(',')
+  }
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  let i = 0
+  const len = line.length
+  while (i < len) {
+    const quoteIdx = inQuotes ? line.indexOf('"', i) : line.indexOf('"', i)
+    const sepIdx = inQuotes ? -1 : line.indexOf(',', i)
+    if (inQuotes) {
+      if (quoteIdx === -1) {
+        current += line.slice(i)
+        i = len
+      } else if (quoteIdx + 1 < len && line.charCodeAt(quoteIdx + 1) === 34) {
+        current += line.slice(i, quoteIdx) + '"'
+        i = quoteIdx + 2
+      } else {
+        current += line.slice(i, quoteIdx)
+        inQuotes = false
+        i = quoteIdx + 1
+      }
+    } else {
+      if (sepIdx === -1 && quoteIdx === -1) {
+        current += line.slice(i)
+        result.push(current)
+        return result
+      }
+      if (sepIdx !== -1 && (quoteIdx === -1 || sepIdx < quoteIdx)) {
+        current += line.slice(i, sepIdx)
+        result.push(current)
+        current = ''
+        i = sepIdx + 1
+      } else {
+        current += line.slice(i, quoteIdx)
+        inQuotes = true
+        i = quoteIdx + 1
+      }
+    }
+  }
+  result.push(current)
+  return result
 }
 
 function gbkLookup(cp: number): number {

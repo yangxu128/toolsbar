@@ -2,10 +2,11 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Upload, FileSpreadsheet, Calculator, GitCompareArrows, Home, ChevronRight, Star } from 'lucide-react'
+import { Upload, FileSpreadsheet, Calculator, GitCompareArrows, Home, ChevronRight, Star, Loader2, RotateCcw } from 'lucide-react'
 import { useKpiStore } from '@/lib/store'
 import { parseExcel } from '@/lib/calc'
 import { useFavStore } from '@/lib/fav-store'
+import { useToastStore } from '@/lib/toast-store'
 import UploadPanel from '@/components/upload-panel'
 import DataTable from '@/components/data-table'
 import MetricTable from '@/components/metric-table'
@@ -22,18 +23,35 @@ const tabs = [
 
 export default function KpiPage() {
   const [activeKey, setActiveKey] = useState('upload')
+  const [uploading, setUploading] = useState(false)
   const loaded = useKpiStore((s) => s.loaded)
   const loadFile = useKpiStore((s) => s.loadFile)
+  const clearData = useKpiStore((s) => s.clearData)
   const isFav = useFavStore((s) => s.isFav)
   const toggleFav = useFavStore((s) => s.toggleFav)
+  const addToast = useToastStore((s) => s.addToast)
   const fav = isFav('kpi')
 
   const handleUpload = useCallback(async (file: File) => {
-    const buffer = await file.arrayBuffer()
-    const data = parseExcel(buffer)
-    loadFile(data.headers, data.rows, data.metrics)
-    setActiveKey('data')
-  }, [loadFile])
+    setUploading(true)
+    try {
+      const buffer = await file.arrayBuffer()
+      const data = parseExcel(buffer)
+      loadFile(data.headers, data.rows, data.metrics)
+      setActiveKey('data')
+      addToast('文件解析成功', 'success')
+    } catch (e: any) {
+      addToast(`解析失败：${e?.message || e}`, 'error')
+    } finally {
+      setUploading(false)
+    }
+  }, [loadFile, addToast])
+
+  const handleClear = useCallback(() => {
+    clearData()
+    setActiveKey('upload')
+    addToast('已清除数据', 'info')
+  }, [clearData, addToast])
 
   const visibleTabs = tabs.filter(t => t.key === 'upload' || loaded)
 
@@ -90,7 +108,28 @@ export default function KpiPage() {
           </div>
 
           <div className="animate-scale-in">
-            {activeKey === 'upload' && <UploadPanel onUpload={handleUpload} />}
+            {activeKey === 'upload' && (
+              uploading ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3 text-[hsl(var(--muted-foreground))]">
+                  <Loader2 className="w-8 h-8 animate-spin text-[hsl(var(--primary))]" />
+                  <span className="text-sm">正在解析文件...</span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {loaded && (
+                    <div className="flex justify-end">
+                      <button
+                        onClick={handleClear}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] hover:border-[hsl(var(--primary))] transition-colors"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> 重新上传 / 清除数据
+                      </button>
+                    </div>
+                  )}
+                  <UploadPanel onUpload={handleUpload} />
+                </div>
+              )
+            )}
             {activeKey === 'data' && loaded && <DataTable />}
             {activeKey === 'metrics' && loaded && <MetricTable />}
             {activeKey === 'calc' && loaded && <CalcGrid />}

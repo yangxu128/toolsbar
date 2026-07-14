@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { UploadCloud, Download, FileCode, X, Home, Star, ChevronRight as ChevronRightIcon } from 'lucide-react'
+import { UploadCloud, Download, FileCode, X, Home, Star, ChevronRight as ChevronRightIcon, XCircle } from 'lucide-react'
 import { useXmlStore } from '@/lib/xml-store'
 import { parseXmlFile } from '@/lib/xml-parser'
 import { useFavStore } from '@/lib/fav-store'
@@ -18,6 +18,7 @@ export default function XmlPage() {
   const toggleFav = useFavStore((s) => s.toggleFav)
   const fav = isFav('xml-reader')
   const [errorMsg, setErrorMsg] = useState('')
+  const [exportName, setExportName] = useState('')
 
   const handleUpload = useCallback(async (file: File) => {
     setErrorMsg('')
@@ -25,6 +26,7 @@ export default function XmlPage() {
       const text = await file.text()
       const result = parseXmlFile(text)
       loadXml(result.headers, result.data, file.name)
+      setExportName(`xml_export_${new Date().toISOString().slice(0, 10)}`)
     } catch (e: any) { setErrorMsg(e.message || '解析失败') }
   }, [loadXml])
 
@@ -36,9 +38,12 @@ export default function XmlPage() {
     ]
     const blob = new Blob(['\ufeff' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `xml_export_${new Date().toISOString().slice(0, 10)}.csv`
+    const url = URL.createObjectURL(blob)
+    a.href = url
+    const safeName = (exportName.trim() || `xml_export_${new Date().toISOString().slice(0, 10)}`).replace(/[\\/:*?"<>|]/g, '_')
+    a.download = safeName.endsWith('.csv') ? safeName : `${safeName}.csv`
     a.click()
+    URL.revokeObjectURL(url)
   }
 
   const columns = headers.map(h => ({
@@ -79,16 +84,25 @@ export default function XmlPage() {
 
         <div className="p-6 sm:p-8 min-h-[400px]">
           {!loaded ? (
-            <UploadArea onUpload={handleUpload} error={errorMsg} />
+            <UploadArea onUpload={handleUpload} error={errorMsg} onCloseError={() => setErrorMsg('')} />
           ) : (
             <div className="animate-scale-in space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium truncate max-w-[280px]" title={fileName}>
                   {fileName}
                 </span>
-                <button onClick={handleExport} className="btn-primary bg-blue-500 hover:bg-blue-600">
-                  <Download className="w-4 h-4" /> 导出CSV
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    value={exportName}
+                    onChange={e => setExportName(e.target.value)}
+                    placeholder="导出文件名"
+                    className="form-input w-auto min-w-[180px] !py-1.5 !px-3 text-sm"
+                  />
+                  <button onClick={handleExport} className="btn-primary bg-blue-500 hover:bg-blue-600">
+                    <Download className="w-4 h-4" /> 导出CSV
+                  </button>
+                </div>
               </div>
               <UnifiedTable
                 columns={columns}
@@ -111,7 +125,7 @@ export default function XmlPage() {
   )
 }
 
-function UploadArea({ onUpload, error }: { onUpload: (f: File) => void; error: string }) {
+function UploadArea({ onUpload, error, onCloseError }: { onUpload: (f: File) => void; error: string; onCloseError: () => void }) {
   const [dragging, setDragging] = useState(false)
 
   return (
@@ -134,7 +148,14 @@ function UploadArea({ onUpload, error }: { onUpload: (f: File) => void; error: s
           选择文件
         </button>
       </div>
-      {error && <div className="error-state mt-3">{error}</div>}
+      {error && (
+        <div className="error-state mt-3 flex items-start justify-between gap-2">
+          <span>{error}</span>
+          <button onClick={onCloseError} className="shrink-0 hover:text-red-700 dark:hover:text-red-300 transition-colors" aria-label="关闭错误">
+            <XCircle className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))] space-y-2">
         <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
         <div className="text-[11px] space-y-1">

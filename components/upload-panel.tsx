@@ -26,20 +26,23 @@ export default function UploadPanel({ onUpload }: Props) {
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
       onClick={() => document.getElementById('kpi-file-input')?.click()}
-      className={`max-w-lg mx-auto rounded-lg border border-dashed p-12 text-center cursor-pointer transition-all ${
-        dragging ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-[hsl(var(--ring)/0.4)]'
+      className={`max-w-lg mx-auto rounded-2xl border border-dashed p-12 text-center cursor-pointer transition-all duration-300 ${
+        dragging
+          ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)] scale-[1.02] shadow-lg shadow-[hsl(var(--primary))]/10'
+          : 'border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-[hsl(var(--ring)/0.4)] hover:shadow-md'
       }`}
     >
       <input id="kpi-file-input" type="file" accept=".xlsx,.xls"
         onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])}
         className="hidden"
       />
-      <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-[hsl(var(--primary))] flex items-center justify-center">
-        <UploadCloud className="w-6 h-6 text-white" />
+      <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl bg-[hsl(var(--primary))] flex items-center justify-center shadow-lg shadow-[hsl(var(--primary))]/30 transition-transform duration-300 ${dragging ? 'scale-110' : ''}`}>
+        <UploadCloud className="w-8 h-8 text-white" />
       </div>
       <h3 className="text-sm font-medium mb-1">上传指标Excel文件</h3>
       <p className="text-xs text-muted mb-2">点击或拖拽 .xlsx 文件到此区域</p>
       <div className="text-[11px] text-muted">需包含 Sheet0（数据）和 指标(计数器)（公式定义）</div>
+      <div className="text-[11px] text-muted mt-1">文件大小限制：10MB</div>
 
       <div className="mt-6 text-left p-4 rounded-xl bg-[hsl(var(--muted))] border border-[hsl(var(--border))] space-y-2">
         <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>

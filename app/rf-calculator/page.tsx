@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Home, ChevronRight as ChevronRightIcon, Star, Radio, Signal, Building2, TowerControl, BookOpen } from 'lucide-react'
+import { Home, ChevronRight as ChevronRightIcon, Star, Radio, Signal, Building2, TowerControl, BookOpen, Copy, Check, Search, ChevronDown } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 import {
   LTE_BANDS, NR_BANDS, calcLteFreq, calcLteEarfcn, calcNrFreq, calcNrArfcn,
@@ -18,8 +18,8 @@ const tabs = [
   { key: 'ref', label: '频段参考', icon: BookOpen },
 ]
 
-const inp = "form-input"
-const btn = "btn-primary bg-sky-500 hover:bg-sky-600 w-full"
+const inputClass = "form-input"
+const buttonClass = "btn-primary w-full"
 
 export default function RfCalculatorPage() {
   const [activeTab, setActiveTab] = useState('lte')
@@ -98,18 +98,122 @@ export default function RfCalculatorPage() {
 }
 
 function ResultBox({ children, empty }: { children: React.ReactNode; empty?: boolean }) {
+  if (empty) {
+    return <div className="mt-4 rounded-xl empty-state">{children}</div>
+  }
   return (
-    <div className={`mt-4 rounded-xl ${empty ? 'empty-state' : 'result-card bg-sky-500/5 border-sky-500/10'}`}>
+    <div className="mt-4 rounded-xl result-card bg-sky-500/5 border-sky-500/10">
       {children}
     </div>
   )
 }
 
 function ResultRow({ label, value }: { label: string; value: React.ReactNode }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = () => {
+    const text = typeof value === 'string' || typeof value === 'number'
+      ? String(value)
+      : extractText(value)
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }
   return (
     <div className="flex justify-between items-center py-1.5 border-b border-dashed border-[hsl(var(--border))] last:border-0">
       <span className="text-sm text-[hsl(var(--muted-foreground))] font-medium">{label}</span>
-      <span className="text-sm font-semibold text-[hsl(var(--foreground))] font-mono">{value}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-sm font-semibold text-[hsl(var(--foreground))] font-mono">{value}</span>
+        <button
+          onClick={handleCopy}
+          className="text-[hsl(var(--muted-foreground))] hover:text-sky-500 transition-colors"
+          aria-label={`复制 ${label}`}
+        >
+          {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function extractText(node: React.ReactNode): string {
+  if (node == null || node === false || node === true) return ''
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(extractText).join('')
+  if (typeof node === 'object' && 'props' in node) {
+    return extractText((node as any).props.children)
+  }
+  return ''
+}
+
+function BandSelect({
+  value,
+  onChange,
+  options,
+  placeholder = '-- 选择频段 --',
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+  placeholder?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const filtered = useMemo(() => {
+    if (!query.trim()) return options
+    const q = query.trim().toLowerCase()
+    return options.filter(o => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q))
+  }, [options, query])
+
+  const selected = options.find(o => o.value === value)
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen(!open); setQuery('') }}
+        className={`${inputClass} flex items-center justify-between text-left`}
+      >
+        <span className={selected ? '' : 'text-[hsl(var(--muted-foreground))]'}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 mt-1 w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-lg overflow-hidden">
+            <div className="p-2 border-b border-[hsl(var(--border))]/50">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="搜索频段..."
+                  className="form-input !py-1.5 !pl-7 text-sm"
+                />
+              </div>
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">无匹配频段</div>
+              ) : filtered.map(o => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => { onChange(o.value); setOpen(false); setQuery('') }}
+                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[hsl(var(--muted))] transition-colors ${
+                    o.value === value ? 'text-sky-600 font-semibold' : 'text-[hsl(var(--foreground))]'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -156,9 +260,9 @@ function LteTab() {
         <div className="mb-3">
           <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入 EARFCN (0 – 65535)</label>
           <input type="number" min={0} max={65535} value={earfcn} onChange={e => setEarfcn(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCalcFreq()}
-            className={inp} placeholder="例如：1300" />
+            className={inputClass} placeholder="例如：1300" />
         </div>
-        <button onClick={handleCalcFreq} className={btn}>计算频率与频段</button>
+        <button onClick={handleCalcFreq} className={buttonClass}>计算频率与频段</button>
         {freqResult ? (
           freqResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{freqResult.error}</span>} /></ResultBox> : (
             <ResultBox>
@@ -180,25 +284,26 @@ function LteTab() {
       <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6">
         <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><Signal className="w-4 h-4" />频率 → EARFCN</h3>
         <div className="mb-3">
-          <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">选择频段</label>
-          <select value={bandSel} onChange={e => setBandSel(e.target.value)} className={inp}>
-            <option value="">-- 选择频段 --</option>
-            {LTE_BANDS.map(b => <option key={b.band} value={b.band}>Band {b.band} ({b.mode}) {b.mode === 'FDD' ? `UL:${b.ulLow}-${b.ulHigh} / DL:${b.dlLow}-${b.dlHigh}` : `TDD:${b.dlLow}-${b.dlHigh}`}</option>)}
-          </select>
-        </div>
+            <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">选择频段</label>
+            <BandSelect
+              value={bandSel}
+              onChange={setBandSel}
+              options={LTE_BANDS.map(b => ({ value: String(b.band), label: `Band ${b.band} (${b.mode}) ${b.mode === 'FDD' ? `UL:${b.ulLow}-${b.ulHigh} / DL:${b.dlLow}-${b.dlHigh}` : `TDD:${b.dlLow}-${b.dlHigh}`}` }))}
+            />
+          </div>
         <div className="mb-3">
           <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入中心频率 (MHz)</label>
           <input type="number" step={0.1} value={freqInput} onChange={e => setFreqInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCalcEarfcn()}
-            className={inp} placeholder="例如：1815.0" />
+            className={inputClass} placeholder="例如：1815.0" />
         </div>
         <div className="mb-3">
           <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">方向</label>
-          <select value={dirSel} onChange={e => setDirSel(e.target.value)} className={inp}>
+          <select value={dirSel} onChange={e => setDirSel(e.target.value)} className={inputClass}>
             <option value="dl">下行 (Downlink)</option>
             <option value="ul">上行 (Uplink)</option>
           </select>
         </div>
-        <button onClick={handleCalcEarfcn} className={btn}>计算 EARFCN</button>
+        <button onClick={handleCalcEarfcn} className={buttonClass}>计算 EARFCN</button>
         {earfcnResult ? (
           earfcnResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{earfcnResult.error}</span>} /></ResultBox> : (
             <ResultBox>
@@ -248,9 +353,9 @@ function NrTab() {
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入 NR-ARFCN (0 – 3279165)</label>
             <input type="number" min={0} max={3279165} value={nrArfcn} onChange={e => setNrArfcn(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleNrFreq()}
-              className={inp} placeholder="例如：620000" />
+              className={inputClass} placeholder="例如：620000" />
           </div>
-          <button onClick={handleNrFreq} className={btn}>计算频率</button>
+          <button onClick={handleNrFreq} className={buttonClass}>计算频率</button>
           {nrFreqResult ? (
             nrFreqResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{nrFreqResult.error}</span>} /></ResultBox> : (
               <ResultBox>
@@ -268,24 +373,25 @@ function NrTab() {
           <h3 className="text-base font-semibold text-sky-600 mb-4 flex items-center gap-2"><Radio className="w-4 h-4" />频率 → NR-ARFCN</h3>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">选择 NR 频段</label>
-            <select value={nrBandSel} onChange={e => setNrBandSel(e.target.value)} className={inp}>
-              <option value="">-- 选择频段 --</option>
-              {NR_BANDS.map(b => <option key={b.band} value={b.band}>{b.band} ({b.mode}) {b.mode === 'FDD' && b.dlLow ? `DL:${b.dlLow}-${b.dlHigh} / UL:${b.ulLow}-${b.ulHigh}` : `${b.low}-${b.high}`} MHz [{b.arfcnStart}-{b.arfcnEnd}]</option>)}
-            </select>
+            <BandSelect
+              value={nrBandSel}
+              onChange={setNrBandSel}
+              options={NR_BANDS.map(b => ({ value: b.band, label: `${b.band} (${b.mode}) ${b.mode === 'FDD' && b.dlLow ? `DL:${b.dlLow}-${b.dlHigh} / UL:${b.ulLow}-${b.ulHigh}` : `${b.low}-${b.high}`} MHz [${b.arfcnStart}-${b.arfcnEnd}]` }))}
+            />
           </div>
-          <div className="mb-3">
-            <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入SSB频率 (MHz)</label>
-            <input type="number" step={0.001} value={nrFreqInput} onChange={e => setNrFreqInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleNrArfcn()}
-              className={inp} placeholder="例如：3410.400" />
-          </div>
-          <div className="mb-3">
-            <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">方向</label>
-            <select value={nrDirSel} onChange={e => setNrDirSel(e.target.value)} className={inp}>
-              <option value="dl">下行 (Downlink)</option>
-              <option value="ul">上行 (Uplink)</option>
-            </select>
-          </div>
-          <button onClick={handleNrArfcn} className={btn}>计算 NR-ARFCN</button>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入SSB频率 (MHz)</label>
+          <input type="number" step={0.001} value={nrFreqInput} onChange={e => setNrFreqInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleNrArfcn()}
+            className={inputClass} placeholder="例如：3410.400" />
+        </div>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">方向</label>
+          <select value={nrDirSel} onChange={e => setNrDirSel(e.target.value)} className={inputClass}>
+            <option value="dl">下行 (Downlink)</option>
+            <option value="ul">上行 (Uplink)</option>
+          </select>
+        </div>
+        <button onClick={handleNrArfcn} className={buttonClass}>计算 NR-ARFCN</button>
           {nrArfcnResult ? (
             nrArfcnResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{nrArfcnResult.error}</span>} /></ResultBox> : (
               <ResultBox>
@@ -348,14 +454,14 @@ function EciTab() {
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入 ECI (十进制或十六进制)</label>
             <div className="flex gap-2">
               <input type="text" value={eciInput} onChange={e => setEciInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleDecode()}
-                className={`${inp} flex-1`} placeholder="例如：108830209 或 0x067C4001" />
-              <select value={eciBase} onChange={e => setEciBase(e.target.value)} className={`${inp} w-[100px]`}>
+                className={`${inputClass} flex-1`} placeholder="例如：108830209 或 0x067C4001" />
+              <select value={eciBase} onChange={e => setEciBase(e.target.value)} className={`${inputClass} w-[100px]`}>
                 <option value="10">十进制</option>
                 <option value="16">十六进制</option>
               </select>
             </div>
           </div>
-          <button onClick={handleDecode} className={btn}>解析 ECI</button>
+          <button onClick={handleDecode} className={buttonClass}>解析 ECI</button>
           {decodeResult ? (
             decodeResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{decodeResult.error}</span>} /></ResultBox> : (
               <ResultBox>
@@ -376,14 +482,14 @@ function EciTab() {
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">eNB ID (0 – 2²⁰-1 = 1048575)</label>
             <input type="number" min={0} max={1048575} value={enbId} onChange={e => setEnbId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleEncode()}
-              className={inp} placeholder="例如：42496" />
-          </div>
-          <div className="mb-3">
-            <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Cell ID (0 – 255)</label>
-            <input type="number" min={0} max={255} value={cellId} onChange={e => setCellId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleEncode()}
-              className={inp} placeholder="例如：1" />
-          </div>
-          <button onClick={handleEncode} className={btn}>合成 ECI</button>
+              className={inputClass} placeholder="例如：42496" />
+        </div>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Cell ID (0 – 255)</label>
+          <input type="number" min={0} max={255} value={cellId} onChange={e => setCellId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleEncode()}
+            className={inputClass} placeholder="例如：1" />
+        </div>
+        <button onClick={handleEncode} className={buttonClass}>合成 ECI</button>
           {encodeResult ? (
             encodeResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{encodeResult.error}</span>} /></ResultBox> : (
               <ResultBox>
@@ -450,8 +556,8 @@ function NciTab() {
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">输入 NCI (十进制或十六进制)</label>
             <div className="flex gap-2">
               <input type="text" value={nciInput} onChange={e => setNciInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleDecode()}
-                className={`${inp} flex-1`} placeholder="例如：68719476735 或 0xFFFFFFFFF" />
-              <select value={nciBase} onChange={e => setNciBase(e.target.value)} className={`${inp} w-[100px]`}>
+                className={`${inputClass} flex-1`} placeholder="例如：68719476735 或 0xFFFFFFFFF" />
+              <select value={nciBase} onChange={e => setNciBase(e.target.value)} className={`${inputClass} w-[100px]`}>
                 <option value="10">十进制</option>
                 <option value="16">十六进制</option>
               </select>
@@ -459,7 +565,7 @@ function NciTab() {
           </div>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">gNB ID 位长 (22 – 32 bits)</label>
-            <select value={gnbIdLen} onChange={e => setGnbIdLen(Number(e.target.value))} className={inp}>
+            <select value={gnbIdLen} onChange={e => setGnbIdLen(Number(e.target.value))} className={inputClass}>
               <option value={22}>22 bits (Cell ID 14 bits)</option>
               <option value={24}>24 bits (Cell ID 12 bits)</option>
               <option value={26}>26 bits (Cell ID 10 bits)</option>
@@ -467,7 +573,7 @@ function NciTab() {
               <option value={32}>32 bits (Cell ID 4 bits)</option>
             </select>
           </div>
-          <button onClick={handleDecode} className={btn}>解析 NCI</button>
+          <button onClick={handleDecode} className={buttonClass}>解析 NCI</button>
           {decodeResult ? (
             decodeResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{decodeResult.error}</span>} /></ResultBox> : (
               <ResultBox>
@@ -491,16 +597,16 @@ function NciTab() {
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">gNB ID</label>
             <input type="number" min={0} value={gnbId} onChange={e => setGnbId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleEncode()}
-              className={inp} placeholder="例如：10598595" />
+              className={inputClass} placeholder="例如：10598595" />
           </div>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Cell ID</label>
             <input type="number" min={0} value={nciCellId} onChange={e => setNciCellId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleEncode()}
-              className={inp} placeholder="例如：980" />
+              className={inputClass} placeholder="例如：980" />
           </div>
           <div className="mb-3">
             <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">gNB ID 位长</label>
-            <select value={gnbIdLenEnc} onChange={e => setGnbIdLenEnc(Number(e.target.value))} className={inp}>
+            <select value={gnbIdLenEnc} onChange={e => setGnbIdLenEnc(Number(e.target.value))} className={inputClass}>
               <option value={22}>22 bits</option>
               <option value={24}>24 bits</option>
               <option value={26}>26 bits</option>
@@ -508,7 +614,7 @@ function NciTab() {
               <option value={32}>32 bits</option>
             </select>
           </div>
-          <button onClick={handleEncode} className={btn}>合成 NCI</button>
+          <button onClick={handleEncode} className={buttonClass}>合成 NCI</button>
           {encodeResult ? (
             encodeResult.error ? <ResultBox empty><ResultRow label="错误" value={<span className="text-red-500">{encodeResult.error}</span>} /></ResultBox> : (
               <ResultBox>

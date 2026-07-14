@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, Home, Star, ChevronRight as ChevronRightIcon, Upload, Download, Settings2, Loader2, CheckCircle2, AlertCircle, FileSpreadsheet, ChevronDown, ChevronUp } from 'lucide-react'
+import { AlertTriangle, Home, Star, ChevronRight as ChevronRightIcon, Upload, Download, Settings2, Loader2, CheckCircle2, AlertCircle, FileSpreadsheet, ChevronDown, ChevronUp, X, RotateCcw } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
-import * as XLSX from 'xlsx'
 
 interface VoiceThresholds {
   accessCnt: number
@@ -99,6 +98,38 @@ function toNum(v: any): number {
   return Number(v)
 }
 
+function FileUpload({ label, file, setFile, accept, required }: {
+  label: string, file: File | null, setFile: (f: File | null) => void, accept: string, required?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <label className="text-sm font-medium text-[hsl(var(--foreground))] min-w-[180px]">
+        {required && <span className="text-red-500 mr-1">*</span>}{label}
+      </label>
+      <div className="flex-1 flex items-center gap-2">
+        <button onClick={() => {
+          const input = document.createElement('input')
+          input.type = 'file'
+          input.accept = accept
+          input.onchange = (e: any) => setFile(e.target.files?.[0] || null)
+          input.click()
+        }} className="px-4 py-2 rounded-lg border border-[hsl(var(--border))] text-sm hover:border-[hsl(var(--primary))] transition-colors bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
+          选择文件
+        </button>
+        {file && (
+          <div className="flex items-center gap-1 text-xs text-emerald-600">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span className="truncate max-w-[200px]">{file.name}</span>
+            <button onClick={() => setFile(null)} className="text-[hsl(var(--muted-foreground))] hover:text-red-500 ml-1">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function CellAnalysisPage() {
   const isFav = useFavStore(s => s.isFav)
   const toggleFav = useFavStore(s => s.toggleFav)
@@ -115,6 +146,30 @@ export default function CellAnalysisPage() {
   const [highLoadTh, setHighLoadTh] = useState<HighLoadThresholds>(defaultHighLoad)
   const [resultSummary, setResultSummary] = useState<string>('')
   const [resultBlob, setResultBlob] = useState<Blob | null>(null)
+  const [progress, setProgress] = useState(0)
+  const cancelRef = useRef(false)
+
+  useEffect(() => {
+    const saved = localStorage.getItem('cell-analysis-thresholds')
+    if (saved) {
+      try {
+        const t = JSON.parse(saved)
+        if (t.voice) setVoiceTh(t.voice)
+        if (t.g5) setG5Th(t.g5)
+        if (t.highLoad) setHighLoadTh(t.highLoad)
+      } catch {}
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('cell-analysis-thresholds', JSON.stringify({ voice: voiceTh, g5: g5Th, highLoad: highLoadTh }))
+  }, [voiceTh, g5Th, highLoadTh])
+
+  const resetThresholds = useCallback(() => {
+    setVoiceTh(defaultVoice)
+    setG5Th(defaultG5)
+    setHighLoadTh(defaultHighLoad)
+  }, [])
 
   const addLog = useCallback((msg: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`])
@@ -129,9 +184,13 @@ export default function CellAnalysisPage() {
     setLogs([])
     setResultSummary('')
     setResultBlob(null)
+    setProgress(0)
+    cancelRef.current = false
 
     try {
+      const XLSX = await import('xlsx')
       addLog('读取质差指标文件...')
+      setProgress(10)
       await yieldToMain()
       const qBuf = await qualityFile.arrayBuffer()
       const qWb = XLSX.read(qBuf, { type: 'array' })
@@ -140,6 +199,7 @@ export default function CellAnalysisPage() {
       const qHeaders: string[] = (qRaw[0] || []).map((h: any) => String(h || ''))
 
       addLog('读取高负荷指标文件...')
+      setProgress(20)
       await yieldToMain()
       const hBuf = await highloadFile.arrayBuffer()
       const hWb = XLSX.read(hBuf, { type: 'array' })
@@ -173,6 +233,7 @@ export default function CellAnalysisPage() {
       const colBand = findCol(hHeaders, ['频段列表'])
 
       addLog('列名自动识别完成')
+      setProgress(30)
       addLog(`语音接入次数: ${colVoiceAccess || '未找到'}`)
       addLog(`语音释放次数: ${colVoiceRelease || '未找到'}`)
       addLog(`语音建立成功率: ${colVoiceSetupSucc || '未找到'}`)
@@ -192,10 +253,13 @@ export default function CellAnalysisPage() {
       const dfQuality = buildRows(qRaw, qHeaders, qNeededCols)
       await yieldToMain()
       addLog(`质差文件：${dfQuality.length}行，${qNeededCols.length}列`)
+      setProgress(40)
+      await yieldToMain()
 
       const dfHighload = buildRows(hRaw, hHeaders, hNeededCols)
       await yieldToMain()
       addLog(`高负荷文件：${dfHighload.length}行，${hNeededCols.length}列`)
+      setProgress(50)
 
       // 小区基础信息
       let cellInfoMap = new Map<string, any>()
@@ -238,10 +302,11 @@ export default function CellAnalysisPage() {
       }
 
       const N = (v: any) => { const n = toNum(v); return isNaN(n) ? 0 : n }
-      const getCity = (r: any, col: string | null) => col ? String(r[col] || '未知').substring(0, 2) || '未知' : '未知'
+      const getCity = (r: any, col: string | null) => col ? String(r[col] || '未知').substring(0, 2).trim() || '未知' : '未知'
 
       // ============ 一、语音质差 ============
       addLog('开始语音质差分析...')
+      setProgress(60)
       await yieldToMain()
       const hasVoiceCols = colVoiceSetupSucc && colVoiceDropRate && colVoiceHoSucc && colVoicePdcpUpLoss && colVoicePdcpDnLoss
 
@@ -251,6 +316,7 @@ export default function CellAnalysisPage() {
 
       if (hasVoiceCols) {
         for (let i = 0; i < dfQuality.length; i++) {
+          if (cancelRef.current) { addLog('分析已取消'); setProcessing(false); return }
           const r = dfQuality[i]
           const ac = colVoiceAccess ? N(r[colVoiceAccess]) : 0
           const rc = colVoiceRelease ? N(r[colVoiceRelease]) : 0
@@ -293,12 +359,14 @@ export default function CellAnalysisPage() {
 
       // ============ 二、5G通用质差 ============
       addLog('开始5G通用质差分析...')
+      setProgress(70)
       await yieldToMain()
       let g5BadRows: any[] = []
       let g5Stats = { total: 0, lowSpeed: 0, lowAccess: 0, highDrop: 0, bad: 0 }
       const g5CityMap = new Map<string, { total: number, lowSpeed: number, lowAccess: number, highDrop: number, bad: number }>()
 
       for (let i = 0; i < dfQuality.length; i++) {
+        if (cancelRef.current) { addLog('分析已取消'); setProcessing(false); return }
         const r = dfQuality[i]
         const ac = col5gAccessCnt ? N(r[col5gAccessCnt]) : 0
         const rc = col5gReleaseCnt ? N(r[col5gReleaseCnt]) : 0
@@ -342,6 +410,7 @@ export default function CellAnalysisPage() {
 
       // ============ 三、高负荷 ============
       addLog('开始高负荷小区分析...')
+      setProgress(80)
       await yieldToMain()
       const highLoadTypeMap = new Map<string, number>()
       let highLoadStats = { total: dfHighload.length, bad: 0 }
@@ -350,6 +419,7 @@ export default function CellAnalysisPage() {
       const hlSubnet = hColSubnet || colSubnet
 
       for (let i = 0; i < dfHighload.length; i++) {
+        if (cancelRef.current) { addLog('分析已取消'); setProcessing(false); return }
         const r = dfHighload[i]
         const city = getCity(r, hlSubnet)
         const prb = colPrbUtil ? toNum(r[colPrbUtil]) : NaN
@@ -395,6 +465,7 @@ export default function CellAnalysisPage() {
       addLog(`高负荷分析完成：监测${highLoadStats.total}个，高负荷${highLoadStats.bad}个`)
 
       // ============ 四、地市汇总 ============
+      setProgress(90)
       await yieldToMain()
       const allCities = new Set<string>()
       voiceCityMap.forEach((_, k) => allCities.add(k))
@@ -424,6 +495,7 @@ export default function CellAnalysisPage() {
 
       // ============ 五、导出Excel ============
       addLog('生成Excel文件...')
+      setProgress(100)
       await yieldToMain()
       const wb = XLSX.utils.book_new()
 
@@ -478,36 +550,6 @@ export default function CellAnalysisPage() {
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }, [resultBlob])
-
-  const FileUpload = ({ label, file, setFile, accept, required }: {
-    label: string, file: File | null, setFile: (f: File | null) => void, accept: string, required?: boolean
-  }) => (
-    <div className="flex items-center gap-3">
-      <label className="text-sm font-medium text-[hsl(var(--foreground))] min-w-[180px]">
-        {required && <span className="text-red-500 mr-1">*</span>}{label}
-      </label>
-      <div className="flex-1 flex items-center gap-2">
-        <button onClick={() => {
-          const input = document.createElement('input')
-          input.type = 'file'
-          input.accept = accept
-          input.onchange = (e: any) => setFile(e.target.files?.[0] || null)
-          input.click()
-        }} className="px-4 py-2 rounded-lg border border-[hsl(var(--border))] text-sm hover:border-[hsl(var(--primary))] transition-colors bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
-          选择文件
-        </button>
-        {file && (
-          <div className="flex items-center gap-1 text-xs text-emerald-600">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span className="truncate max-w-[200px]">{file.name}</span>
-            <button onClick={() => setFile(null)} className="text-[hsl(var(--muted-foreground))] hover:text-red-500 ml-1">
-              <AlertCircle className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
 
   return (
     <div className="animate-fade-in-up">
@@ -640,15 +682,41 @@ export default function CellAnalysisPage() {
                       </div>
                     </div>
                   </div>
+
+                  <button onClick={resetThresholds}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] border border-[hsl(var(--border))] rounded-md hover:border-[hsl(var(--primary))] transition-colors">
+                    <RotateCcw className="w-3 h-3" /> 重置默认值
+                  </button>
                 </div>
               )}
             </div>
 
             {/* 运行按钮 */}
-            <button onClick={handleRun} disabled={processing || !qualityFile || !highloadFile}
-              className="w-full py-3 rounded-xl bg-[hsl(var(--primary))] text-white font-medium text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              {processing ? <><Loader2 className="w-4 h-4 animate-spin" />分析中...</> : <><AlertTriangle className="w-4 h-4" />开始分析</>}
-            </button>
+            <div className="flex gap-3">
+              <button onClick={handleRun} disabled={processing || !qualityFile || !highloadFile}
+                className="flex-1 py-3 rounded-xl bg-[hsl(var(--primary))] text-white font-medium text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                {processing ? <><Loader2 className="w-4 h-4 animate-spin" />分析中...</> : <><AlertTriangle className="w-4 h-4" />开始分析</>}
+              </button>
+              {processing && (
+                <button onClick={() => { cancelRef.current = true }}
+                  className="px-4 py-3 rounded-xl border border-red-500/30 text-red-500 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center gap-1.5">
+                  <X className="w-4 h-4" /> 取消
+                </button>
+              )}
+            </div>
+
+            {/* 进度条 */}
+            {processing && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px] text-[hsl(var(--muted-foreground))]">
+                  <span>分析进度</span>
+                  <span>{progress}%</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-[hsl(var(--border))] overflow-hidden">
+                  <div className="h-full bg-[hsl(var(--primary))] rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+                </div>
+              </div>
+            )}
 
             {/* 结果 */}
             {resultSummary && (

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import {
   MapPin, UploadCloud, Home, Star, ChevronRight,
   X, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2,
-  Settings2, Eye, EyeOff
+  Settings2, Eye, EyeOff, Search, RefreshCw
 } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
@@ -28,15 +28,29 @@ export default function CellMapPage() {
   const [tiandituKey, setTiandituKey] = useState('')
   const [showKeyInput, setShowKeyInput] = useState(false)
   const [mapLoaded, setMapLoaded] = useState(false)
+  const [mapError, setMapError] = useState(false)
   const [headers, setHeaders] = useState<string[]>([])
   const [latCol, setLatCol] = useState('')
   const [lngCol, setLngCol] = useState('')
   const [azimuthCol, setAzimuthCol] = useState('')
   const [nameCol, setNameCol] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sectorRadius, setSectorRadius] = useState(0.3)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstance = useRef<any>(null)
   const layersRef = useRef<any[]>([])
+  const rawRowsRef = useRef<any[][]>([])
+
+  const filteredCells = useMemo(() => {
+    if (!searchQuery.trim()) return cells
+    const q = searchQuery.trim().toLowerCase()
+    return cells.filter(c =>
+      String(c.name || '').toLowerCase().includes(q) ||
+      String(c.lat).includes(q) ||
+      String(c.lng).includes(q)
+    )
+  }, [cells, searchQuery])
 
   const addLog = useCallback((msg: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`])
@@ -54,44 +68,6 @@ export default function CellMapPage() {
     if (tiandituKey && !mapLoaded) initMap()
   }, [tiandituKey, mapLoaded, addLog])
 
-  const initMap = useCallback(() => {
-    if (!mapRef.current || !tiandituKey || mapInstance.current) return
-
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-    document.head.appendChild(link)
-
-    const script = document.createElement('script')
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-    script.onload = () => {
-      const L = (window as any).L
-      if (!L || !mapRef.current) return
-
-      const map = L.map(mapRef.current).setView([39.89945, 116.40769], 12)
-
-      const vecLayer = L.tileLayer(
-        `https://t{s}.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=${tiandituKey}`,
-        { subdomains: '0123', attribution: '天地图' }
-      )
-      const ciaLayer = L.tileLayer(
-        `https://t{s}.tianditu.gov.cn/DataServer?T=cia_w&x={x}&y={y}&l={z}&tk=${tiandituKey}`,
-        { subdomains: '0123' }
-      )
-      vecLayer.addTo(map)
-      ciaLayer.addTo(map)
-
-      mapInstance.current = map
-      setMapLoaded(true)
-      addLog('天地图加载成功')
-      if (cells.length > 0) drawCells()
-    }
-    script.onerror = () => {
-      addLog('Leaflet加载失败，请检查网络')
-    }
-    document.head.appendChild(script)
-  }, [tiandituKey, cells, addLog])
-
   const drawCells = useCallback(() => {
     const L = (window as any).L
     const map = mapInstance.current
@@ -100,27 +76,74 @@ export default function CellMapPage() {
     layersRef.current.forEach(l => map.removeLayer(l))
     layersRef.current = []
 
-    cells.forEach((cell) => {
+    filteredCells.forEach((cell) => {
       const marker = L.marker([cell.lat, cell.lng]).addTo(map)
       marker.bindTooltip(cell.name || '', { permanent: true, direction: 'top', offset: [0, -8], className: 'cell-label' })
       layersRef.current.push(marker)
 
-      const sectorPoints = calcSectorPoints(cell.lat, cell.lng, cell.azimuth, 0.3)
+      const sectorPoints = calcSectorPoints(cell.lat, cell.lng, cell.azimuth, sectorRadius)
       const polygon = L.polygon(sectorPoints.map((p: any) => [p.lat, p.lng]), {
         color: '#3b82f6', weight: 2, opacity: 0.8, fillColor: '#3b82f6', fillOpacity: 0.3
       }).addTo(map)
       layersRef.current.push(polygon)
     })
 
-    if (cells.length > 0) {
-      const bounds = L.latLngBounds(cells.map(c => [c.lat, c.lng]))
+    if (filteredCells.length > 0) {
+      const bounds = L.latLngBounds(filteredCells.map(c => [c.lat, c.lng]))
       map.fitBounds(bounds, { padding: [30, 30] })
     }
-  }, [cells])
+  }, [filteredCells, sectorRadius])
+
+  const initMap = useCallback(() => {
+    if (!mapRef.current || !tiandituKey || mapInstance.current) return
+
+    const createMapInstance = () => {
+      const L = (window as any).L
+      if (!L || !mapRef.current) return false
+      const map = L.map(mapRef.current).setView([39.89945, 116.40769], 12)
+      L.tileLayer(
+        `https://t{s}.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=${tiandituKey}`,
+        { subdomains: '0123', attribution: '天地图' }
+      ).addTo(map)
+      L.tileLayer(
+        `https://t{s}.tianditu.gov.cn/DataServer?T=cia_w&x={x}&y={y}&l={z}&tk=${tiandituKey}`,
+        { subdomains: '0123' }
+      ).addTo(map)
+      mapInstance.current = map
+      setMapLoaded(true)
+      setMapError(false)
+      addLog('天地图加载成功')
+      if (filteredCells.length > 0) drawCells()
+      return true
+    }
+
+    if ((window as any).L) {
+      if (createMapInstance()) return
+    }
+
+    if (!document.querySelector('link[href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"]')) {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+      document.head.appendChild(link)
+    }
+
+    const oldScript = document.querySelector('script[src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"]')
+    if (oldScript) oldScript.remove()
+
+    const script = document.createElement('script')
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+    script.onload = () => { createMapInstance() }
+    script.onerror = () => {
+      addLog('Leaflet加载失败，请检查网络')
+      setMapError(true)
+    }
+    document.head.appendChild(script)
+  }, [tiandituKey, filteredCells, addLog, drawCells])
 
   useEffect(() => {
-    if (mapLoaded && cells.length > 0) drawCells()
-  }, [cells, mapLoaded, drawCells])
+    if (mapLoaded && filteredCells.length > 0) drawCells()
+  }, [filteredCells, mapLoaded, drawCells])
 
   const calcSectorPoints = (lat: number, lng: number, azimuth: number, radiusKm: number) => {
     const points = [{ lat, lng }]
@@ -173,6 +196,7 @@ export default function CellMapPage() {
       }
 
       setHeaders(headers)
+      rawRowsRef.current = rows
 
       const lat = findCol(headers, ['lat', '纬度', 'latitude', '纬'])
       const lng = findCol(headers, ['lng', 'lon', '经度', 'longitude', '经'])
@@ -219,7 +243,7 @@ export default function CellMapPage() {
   }, [parseExcel, addLog, mapLoaded, tiandituKey, initMap])
 
   const handleManualParse = useCallback(() => {
-    if (!latCol || !lngCol || !cells.length) return
+    if (!latCol || !lngCol || !rawRowsRef.current.length) return
 
     const latIdx = headers.indexOf(latCol)
     const lngIdx = headers.indexOf(lngCol)
@@ -227,7 +251,7 @@ export default function CellMapPage() {
     const nameIdx = headers.indexOf(nameCol)
 
     const parsed: CellData[] = []
-    for (const row of cells as any) {
+    for (const row of rawRowsRef.current) {
       const latVal = parseFloat(String(row[latIdx]))
       const lngVal = parseFloat(String(row[lngIdx]))
       const azVal = azIdx >= 0 ? parseFloat(String(row[azIdx])) || 0 : 0
@@ -242,7 +266,7 @@ export default function CellMapPage() {
 
     setCells(parsed)
     addLog(`重新解析：${parsed.length} 个小区`)
-  }, [latCol, lngCol, azimuthCol, nameCol, headers, cells, addLog])
+  }, [latCol, lngCol, azimuthCol, nameCol, headers, addLog])
 
   return (
     <div className="animate-fade-in-up">
@@ -391,20 +415,42 @@ export default function CellMapPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">搜索/筛选小区</label>
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
+                    <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                      placeholder="按名称/经纬度搜索..."
+                      className="w-full pl-9 pr-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm bg-[hsl(var(--card))] text-[hsl(var(--foreground))]" />
+                  </div>
+                  {searchQuery && (
+                    <p className="text-[10px] text-[hsl(var(--muted-foreground))] mt-1">
+                      匹配 {filteredCells.length} / {cells.length} 个小区
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))] mb-1">扇区半径（km）</label>
+                  <input type="number" step="0.1" min="0.05" value={sectorRadius} onChange={e => setSectorRadius(Math.max(0.05, +e.target.value || 0.3))}
+                    className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] text-sm bg-[hsl(var(--card))] text-[hsl(var(--foreground))]" />
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
                 <button onClick={handleManualParse}
                   className="flex items-center gap-1.5 px-4 py-2 bg-[hsl(var(--primary))] text-white text-sm font-medium rounded-md hover:opacity-90">
                   <MapPin className="w-3.5 h-3.5" /> 重新解析并展示
                 </button>
-                <button onClick={() => { setCells([]); setLogs([]); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                <button onClick={() => { setCells([]); rawRowsRef.current = []; setLogs([]); if (fileInputRef.current) fileInputRef.current.value = '' }}
                   className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors">
                   <X className="w-3.5 h-3.5" /> 清除数据
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
+              <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] flex-wrap">
                 <span className="px-2 py-1 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 font-medium">
-                  {cells.length} 个小区
+                  {filteredCells.length} 个小区{searchQuery ? `（共${cells.length}）` : ''}
                 </span>
                 {mapLoaded ? (
                   <span className="px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium">
@@ -415,21 +461,52 @@ export default function CellMapPage() {
                     地图未加载
                   </span>
                 )}
+                {cells.length > 500 && (
+                  <span className="px-2 py-1 rounded-full bg-orange-50 dark:bg-orange-900/30 text-orange-600 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> 数据量较大，建议缩小范围或使用聚合
+                  </span>
+                )}
               </div>
 
-              {!mapLoaded && tiandituKey && (
+              {mapError && tiandituKey && (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                  <span className="text-xs text-red-600 flex-1">地图加载失败，请检查网络连接</span>
+                  <button onClick={() => { setMapError(false); initMap() }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white text-xs font-medium rounded-md hover:bg-red-600">
+                    <RefreshCw className="w-3 h-3" /> 重试
+                  </button>
+                </div>
+              )}
+
+              {!mapLoaded && !mapError && tiandituKey && (
                 <button onClick={initMap}
                   className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-md transition-colors">
                   加载天地图
                 </button>
               )}
 
-              <div ref={mapRef} className="w-full h-[500px] rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
-                {!mapLoaded && !tiandituKey && (
-                  <div className="w-full h-full flex items-center justify-center text-[hsl(var(--muted-foreground))]">
-                    <div className="text-center">
-                      <MapPin className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">请先配置天地图Key</p>
+              <div className="relative">
+                <div ref={mapRef} className="w-full h-[500px] rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+                  {!mapLoaded && !tiandituKey && (
+                    <div className="w-full h-full flex items-center justify-center text-[hsl(var(--muted-foreground))]">
+                      <div className="text-center">
+                        <MapPin className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">请先配置天地图Key</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {mapLoaded && (
+                  <div className="absolute bottom-4 left-4 bg-white/90 dark:bg-black/80 rounded-lg p-3 text-xs shadow-lg z-[1000]">
+                    <div className="font-semibold text-[hsl(var(--foreground))] mb-1.5">图例</div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                      <span className="text-[hsl(var(--foreground))]">小区位置</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-blue-500/30 border border-blue-500"></div>
+                      <span className="text-[hsl(var(--foreground))]">扇区覆盖（{sectorRadius}km, 65°）</span>
                     </div>
                   </div>
                 )}
