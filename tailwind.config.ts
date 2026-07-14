@@ -45,6 +45,21 @@ const config: Config = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      animation: {
+        'fade-in-up': 'fadeInUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+        'fade-in': 'fadeIn 0.4s ease-out forwards',
+        'scale-in': 'scaleIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+        'slide-in-right': 'slideInRight 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+        'slide-in-left': 'slideInLeft 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+        'float': 'float 3s ease-in-out infinite',
+        'shimmer': 'shimmer 1.5s infinite',
+        'pulse-ring': 'pulse-ring 1.8s ease-out infinite',
+        'press': 'press 0.2s ease-out',
+      },
+      transitionTimingFunction: {
+        'spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'smooth': 'cubic-bezier(0.22, 1, 0.36, 1)',
+      },
     },
   },
 }

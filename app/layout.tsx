@@ -15,10 +15,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const toggleTheme = useThemeStore((s) => s.toggleTheme)
   const pathname = usePathname()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const [pageKey, setPageKey] = useState(pathname)
   const searchQuery = useSearchStore((s) => s.query)
   const setSearchQuery = useSearchStore((s) => s.setQuery)
   const desktopInputRef = useRef<HTMLInputElement>(null)
   const mobileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setPageKey(pathname)
+  }, [pathname])
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -55,13 +68,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ToastContainer />
         <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
-        <header className="glass-header sticky top-0 z-50 h-16 flex items-center">
+        <header className={`glass-header sticky top-0 z-50 h-16 flex items-center transition-all duration-300 ${scrolled ? 'shadow-lg shadow-black/5' : ''}`}>
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
             <Link href="/" onClick={() => setSearchQuery('')} className="flex items-center gap-2.5 shrink-0 group">
-              <div className="w-8 h-8 rounded-lg bg-[hsl(var(--primary))] flex items-center justify-center text-white shadow-md group-hover:shadow-[hsl(var(--primary))]/30 transition-shadow">
-                <Box className="w-5 h-5" />
+              <div className="w-8 h-8 rounded-lg bg-[hsl(var(--primary))] flex items-center justify-center text-white shadow-md group-hover:shadow-[hsl(var(--primary))]/40 group-hover:scale-105 transition-all duration-300">
+                <Box className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300" />
               </div>
-              <span className="text-lg font-bold tracking-tight text-[hsl(var(--foreground))]">uanx</span>
+              <span className="text-lg font-bold tracking-tight text-[hsl(var(--foreground))] group-hover:text-[hsl(var(--primary))] transition-colors duration-300">uanx</span>
             </Link>
 
             <div className="hidden md:flex flex-1 max-w-md relative">
@@ -108,7 +121,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </div>
 
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <main key={pageKey} className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 animate-fade-in">
           {children}
         </main>
 

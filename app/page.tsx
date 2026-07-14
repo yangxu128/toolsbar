@@ -241,14 +241,21 @@ export default function Home() {
     setTimeout(() => setAnimatingFav(null), 500)
   }
 
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    e.currentTarget.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`)
+    e.currentTarget.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`)
+  }
+
   return (
     <div className="space-y-10">
       {/* Hero */}
-      <section>
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[hsl(var(--foreground))] mb-3">
-          你的个人 <span className="text-[hsl(var(--primary))]">工具指挥中心</span>
+      <section className="relative">
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-[hsl(var(--primary))]/10 rounded-full blur-3xl pointer-events-none" />
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[hsl(var(--foreground))] mb-3 animate-fade-in-up">
+          你的个人 <span className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(217,91%,60%)] bg-clip-text text-transparent">工具指挥中心</span>
         </h1>
-        <p className="text-[hsl(var(--muted-foreground))] text-base sm:text-lg max-w-2xl leading-relaxed">
+        <p className="text-[hsl(var(--muted-foreground))] text-base sm:text-lg max-w-2xl leading-relaxed animate-fade-in-up stagger-2">
           收集、整理、调用。所有数据仅存于浏览器本地，零后端依赖，隐私无忧。
         </p>
       </section>
@@ -256,10 +263,10 @@ export default function Home() {
       {/* Stats */}
       <section>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <div className="stat-card">
+          <div className="stat-card animate-fade-in-up stagger-1">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[hsl(var(--muted-foreground))] text-xs font-semibold uppercase tracking-wider">已收录工具</span>
-              <div className="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center text-[hsl(var(--primary))]">
+              <div className="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center text-[hsl(var(--primary))] group-hover:scale-110 transition-transform duration-300">
                 <Wrench className="w-4 h-4" />
               </div>
             </div>
@@ -267,7 +274,7 @@ export default function Home() {
             <div className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">持续更新中</div>
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card animate-fade-in-up stagger-2">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[hsl(var(--muted-foreground))] text-xs font-semibold uppercase tracking-wider">工具分类</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600">
@@ -278,7 +285,7 @@ export default function Home() {
             <div className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">覆盖多场景</div>
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card animate-fade-in-up stagger-3">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[hsl(var(--muted-foreground))] text-xs font-semibold uppercase tracking-wider">我的收藏</span>
               <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
@@ -289,7 +296,7 @@ export default function Home() {
             <div className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">快速访问常用</div>
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card animate-fade-in-up stagger-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[hsl(var(--muted-foreground))] text-xs font-semibold uppercase tracking-wider">本地存储</span>
               <div className="w-8 h-8 rounded-lg bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center text-violet-600">
@@ -303,7 +310,7 @@ export default function Home() {
       </section>
 
       {/* Filters */}
-      <section className="flex flex-wrap items-center gap-2">
+      <section className="flex flex-wrap items-center gap-2 animate-fade-in-up stagger-3">
         {categories.map((cat) => {
           const Icon = cat.icon
           return (
@@ -312,7 +319,7 @@ export default function Home() {
               onClick={() => setActiveCategory(cat.key)}
               className={`filter-chip ${activeCategory === cat.key ? 'active' : ''}`}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className={`w-3.5 h-3.5 transition-transform duration-300 ${activeCategory === cat.key ? 'scale-110' : ''}`} />
               {cat.label}
             </button>
           )
@@ -321,15 +328,15 @@ export default function Home() {
 
       {/* Tools Grid */}
       {filteredTools.length === 0 ? (
-        <div className="py-20 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-4">
-            <Search className="w-8 h-8 text-[hsl(var(--muted-foreground))]" />
+        <div className="py-24 text-center animate-scale-in">
+          <div className="w-20 h-20 rounded-2xl bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-5 animate-float">
+            <Search className="w-9 h-9 text-[hsl(var(--muted-foreground))]" />
           </div>
           <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] mb-1">未找到相关工具</h3>
           <p className="text-[hsl(var(--muted-foreground))] text-sm">尝试更换关键词或清除筛选条件</p>
           <button
             onClick={() => { setSearchGlobal(''); setActiveCategory('all') }}
-            className="mt-4 px-4 py-2 bg-[hsl(var(--primary))] text-white rounded-lg font-medium text-sm hover:opacity-90 active:scale-[0.97] transition-all"
+            className="mt-5 px-5 py-2.5 bg-[hsl(var(--primary))] text-white rounded-xl font-medium text-sm hover:opacity-90 active:scale-[0.97] transition-all shadow-lg shadow-[hsl(var(--primary))]/20"
           >
             清除筛选
           </button>
@@ -344,6 +351,7 @@ export default function Home() {
 
             const card = (
               <div
+                onMouseMove={handleMouseMove}
                 className={`tool-card ${comingSoon ? 'coming-soon' : ''} animate-fade-in-up stagger-${stagger}`}
               >
                 {comingSoon ? (
@@ -358,7 +366,7 @@ export default function Home() {
                     className={`absolute top-3 right-3 p-1.5 rounded-lg hover:bg-[hsl(var(--muted))] transition-all ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}
                     title={fav ? '取消收藏' : '收藏'}
                   >
-                    <Star className={`w-4 h-4 ${fav ? 'fill-current' : ''} ${animatingFav === tool.id ? 'animate-bounce-soft' : ''}`} />
+                    <Star className={`w-4 h-4 ${fav ? 'fill-current' : ''} ${animatingFav === tool.id ? 'animate-heart-beat' : ''} transition-transform duration-200`} />
                   </button>
                 )}
 
@@ -377,14 +385,14 @@ export default function Home() {
                 <div className="flex items-center justify-between pt-3 border-t border-[hsl(var(--border))]">
                   <div className="flex gap-1.5 flex-wrap">
                     {tool.tags.slice(0, 2).map((tag) => (
-                      <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] font-medium">
+                      <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] font-medium">
                         {tag}
                       </span>
                     ))}
                   </div>
                   {tool.available && (
-                    <span className="inline-flex items-center text-xs font-medium text-[hsl(var(--primary))] group-hover:translate-x-0.5 transition-transform">
-                      进入 <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                    <span className="inline-flex items-center text-xs font-medium text-[hsl(var(--primary))] group-hover:translate-x-1 transition-transform duration-300">
+                      进入 <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform duration-300" />
                     </span>
                   )}
                 </div>

@@ -569,7 +569,7 @@ function RefTab() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in-up">
       <div>
         <h3 className="text-base font-semibold text-[hsl(var(--foreground))] mb-3 flex items-center gap-2"><Signal className="w-4 h-4 text-sky-600" />LTE 频段 EARFCN 参考表</h3>
         <UnifiedTable columns={lteColumns} data={lteRefData} pagination pageSize={10} showTotal />

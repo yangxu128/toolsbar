@@ -58,7 +58,7 @@ export default function JsonFormatterPage() {
   }, [])
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       <nav className="flex items-center gap-2 text-sm mb-6 text-[hsl(var(--muted-foreground))]">
         <Link href="/" className="hover:text-[hsl(var(--primary))] transition-colors flex items-center gap-1"><Home className="w-4 h-4" />首页</Link>
         <ChevronRightIcon className="w-4 h-4" /><span>开发工具</span>
@@ -75,7 +75,7 @@ export default function JsonFormatterPage() {
                 <p className="text-[hsl(var(--muted-foreground))] mt-1">JSON 美化、压缩、校验</p>
               </div>
             </div>
-            <button onClick={() => toggleFav('json-formatter')} className={`icon-btn shrink-0 ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}><Star className={`w-5 h-5 ${fav ? 'fill-current' : ''}`} /></button>
+            <button onClick={() => toggleFav('json-formatter')} className={`icon-btn shrink-0 ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}><Star className={`w-5 h-5 ${fav ? 'fill-current' : ''} ${fav ? 'animate-heart-beat' : ''}`} /></button>
           </div>
         </div>
 
@@ -83,7 +83,7 @@ export default function JsonFormatterPage() {
           <div className="flex flex-wrap items-center gap-3 mb-4">
             {(['format', 'minify', 'validate'] as Mode[]).map(m => (
               <button key={m} onClick={() => setMode(m)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mode === m ? 'bg-violet-500 text-white' : 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] hover:bg-violet-100 dark:hover:bg-violet-900/30'}`}>
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 ${mode === m ? 'bg-violet-500 text-white shadow-md shadow-violet-500/25 scale-105' : 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] hover:bg-violet-100 dark:hover:bg-violet-900/30 hover:scale-105'}`}>
                 {{ format: '美化', minify: '压缩', validate: '校验' }[m]}
               </button>
             ))}

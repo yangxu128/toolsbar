@@ -111,7 +111,7 @@ export default function ColorPickerPage() {
   const ratioBlack = contrastRatio(hex, '#000000')
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       <nav className="flex items-center gap-2 text-sm mb-6 text-[hsl(var(--muted-foreground))]">
         <Link href="/" className="hover:text-[hsl(var(--primary))] transition-colors flex items-center gap-1"><Home className="w-4 h-4" />首页</Link>
         <ChevronRightIcon className="w-4 h-4" /><span>设计工具</span>
@@ -128,7 +128,7 @@ export default function ColorPickerPage() {
                 <p className="text-[hsl(var(--muted-foreground))] mt-1">HEX / RGB / HSL 互转，色板生成，对比度检查</p>
               </div>
             </div>
-            <button onClick={() => toggleFav('color-picker')} className={`icon-btn shrink-0 ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}><Star className={`w-5 h-5 ${fav ? 'fill-current' : ''}`} /></button>
+            <button onClick={() => toggleFav('color-picker')} className={`icon-btn shrink-0 ${fav ? 'text-amber-400' : 'text-[hsl(var(--border))] dark:text-[hsl(var(--muted-foreground))]'}`}><Star className={`w-5 h-5 ${fav ? 'fill-current' : ''} ${fav ? 'animate-heart-beat' : ''}`} /></button>
           </div>
         </div>
 
