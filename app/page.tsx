@@ -177,6 +177,19 @@ const tools = [
     categoryLabel: '数据处理',
     available: true,
   },
+  {
+    id: 'site-merge',
+    name: '物理站址合并',
+    desc: '基于经纬度距离合并邻近物理站址，支持宏站/室分分离处理，空间网格加速',
+    icon: GitMerge,
+    color: 'bg-lime-600',
+    colorLight: 'bg-lime-50 text-lime-600',
+    path: '/site-merge',
+    tags: ['站址', '合并'],
+    category: 'data',
+    categoryLabel: '数据处理',
+    available: true,
+  },
 ]
 
 function useCountUp(target: number, duration = 1500) {
