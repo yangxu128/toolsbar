@@ -2,8 +2,9 @@
 
 import { useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { Home, Star, ChevronRight as ChevronRightIcon, FileSpreadsheet, X, Loader2, CheckCircle2, AlertCircle, Settings2, Upload, Download } from 'lucide-react'
+import { Home, Star, ChevronRight as ChevronRightIcon, FileSpreadsheet, X, Loader2, CheckCircle2, AlertCircle, Settings2, Upload, RotateCcw } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
+import { useToastStore } from '@/lib/toast-store'
 
 type Row = Record<string, any>
 
@@ -11,12 +12,15 @@ export default function SiteMergePage() {
   const isFav = useFavStore((s) => s.isFav)
   const toggleFav = useFavStore((s) => s.toggleFav)
   const fav = isFav('site-merge')
+  const toast = useToastStore((s) => s.addToast)
 
   const [headers, setHeaders] = useState<string[]>([])
   const [rows, setRows] = useState<Row[]>([])
   const [fileName, setFileName] = useState('')
   const [logs, setLogs] = useState<string[]>([])
   const [processing, setProcessing] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
 
@@ -38,6 +42,7 @@ export default function SiteMergePage() {
     setError('')
     setDone(false)
     setLogs([])
+    setLoading(true)
     addLog(`正在读取文件: ${file.name}`)
     try {
       const XLSX = await import('xlsx')
@@ -47,6 +52,7 @@ export default function SiteMergePage() {
       const raw = XLSX.utils.sheet_to_json<Row[]>(ws, { defval: '' })
       if (raw.length === 0) {
         setError('文件为空或无数据行')
+        toast('文件为空或无数据行', 'error')
         return
       }
       const cols = Object.keys(raw[0])
@@ -54,6 +60,7 @@ export default function SiteMergePage() {
       setRows(raw)
       setFileName(file.name)
       addLog(`读取成功，共 ${raw.length} 行，${cols.length} 列`)
+      toast(`读取成功，${raw.length} 行 ${cols.length} 列`, 'success')
 
       const find = (keywords: string[]) => cols.find(c => keywords.some(k => c.toLowerCase().includes(k.toLowerCase())))
       setColLng(find(['经度', 'longitude', 'lng', 'lon']) || '')
@@ -63,6 +70,9 @@ export default function SiteMergePage() {
     } catch (e: any) {
       setError(`读取失败: ${e.message}`)
       addLog(`读取失败: ${e.message}`)
+      toast(`读取失败: ${e.message}`, 'error')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -298,55 +308,62 @@ export default function SiteMergePage() {
       {!rows.length ? (
         <div
           onDrop={onDrop}
-          onDragOver={e => e.preventDefault()}
-          className="bg-[hsl(var(--card))] rounded-2xl border-2 border-dashed border-[hsl(var(--border))] p-12 text-center hover:border-[hsl(var(--primary))]/50 transition-colors cursor-pointer"
-          onClick={() => fileInputRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          className={`bg-[hsl(var(--card))] rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-300 ${
+            dragging
+              ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)] scale-[1.02] shadow-lg shadow-[hsl(var(--primary))]/10'
+              : 'border-[hsl(var(--border))] hover:border-[hsl(var(--ring)/0.4)] hover:shadow-md'
+          } ${loading ? 'pointer-events-none opacity-60' : ''}`}
+          onClick={() => !loading && fileInputRef.current?.click()}
         >
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
-          <div className="w-16 h-16 rounded-2xl bg-green-50 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
-            <Upload className="w-8 h-8 text-green-600" />
+          <div className={`w-16 h-16 rounded-2xl bg-[hsl(var(--primary))] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[hsl(var(--primary))]/30 transition-transform duration-300 ${dragging ? 'scale-110' : ''}`}>
+            {loading ? <Loader2 className="w-8 h-8 text-white animate-spin" /> : <Upload className="w-8 h-8 text-white" />}
           </div>
-          <p className="text-base font-medium text-[hsl(var(--foreground))] mb-1">点击或拖拽上传 Excel 文件</p>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">支持 .xlsx / .xls 格式</p>
+          <p className="text-base font-medium text-[hsl(var(--foreground))] mb-1">{loading ? '正在读取文件...' : '点击或拖拽上传 Excel 文件'}</p>
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">支持 .xlsx / .xls 格式，文件大小限制 10MB</p>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-scale-in">
           <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-green-500" />
                 <span className="font-medium text-[hsl(var(--foreground))]">{fileName}</span>
-                <span className="text-sm text-[hsl(var(--muted-foreground))]">{rows.length} 行</span>
+                <span className="text-sm text-[hsl(var(--muted-foreground))]">{rows.length} 行 · {headers.length} 列</span>
               </div>
-              <button onClick={handleReset} className="icon-btn"><X className="w-4 h-4" /></button>
+              <button onClick={handleReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors">
+                <RotateCcw className="w-3.5 h-3.5" />重新上传
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5">经度列</label>
+                <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5">经度列 *</label>
                 <select value={colLng} onChange={e => setColLng(e.target.value)} className="form-input">
-                  <option value="">-- 选择 --</option>
+                  <option value="">-- 选择列 --</option>
                   {headers.map(h => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5">纬度列</label>
+                <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5">纬度列 *</label>
                 <select value={colLat} onChange={e => setColLat(e.target.value)} className="form-input">
-                  <option value="">-- 选择 --</option>
+                  <option value="">-- 选择列 --</option>
                   {headers.map(h => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5">覆盖类型列</label>
+                <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5">覆盖类型列 {separate ? '*' : '(可选)'}</label>
                 <select value={colCovType} onChange={e => setColCovType(e.target.value)} className="form-input">
-                  <option value="">-- 选择 --</option>
+                  <option value="">-- 选择列 --</option>
                   {headers.map(h => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5">物理站址标识列</label>
+                <label className="block text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5">物理站址标识列 *</label>
                 <select value={colSiteId} onChange={e => setColSiteId(e.target.value)} className="form-input">
-                  <option value="">-- 选择 --</option>
+                  <option value="">-- 选择列 --</option>
                   {headers.map(h => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
@@ -364,7 +381,7 @@ export default function SiteMergePage() {
               <div className="flex-1" />
               {processing ? (
                 <button onClick={() => { cancelRef.current = true }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500 text-white text-sm font-medium hover:opacity-90 active:scale-95 transition-all">
-                  <X className="w-4 h-4" />取消
+                  <Loader2 className="w-4 h-4 animate-spin" />取消
                 </button>
               ) : (
                 <button onClick={handleRun} className="btn-primary">
