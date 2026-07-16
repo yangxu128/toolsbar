@@ -268,19 +268,42 @@ export default function SiteMergePage() {
         return
       }
 
-      addLog('导出 Excel...')
-      const XLSX = await import('xlsx')
-      const ws = XLSX.utils.json_to_sheet(result)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, '合并结果')
-      const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-      const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `站址合并_${new Date().toISOString().slice(0, 10)}.xlsx`
-      a.click()
-      URL.revokeObjectURL(url)
+      addLog('导出文件...')
+      const dateStr = new Date().toISOString().slice(0, 10)
+
+      if (result.length > 100000) {
+        addLog(`数据量较大 (${result.length} 行)，使用 CSV 格式导出...`)
+        const cols = Object.keys(result[0])
+        const parts: string[] = ['\uFEFF' + cols.map(c => `"${c}"`).join(',') + '\n']
+        for (let i = 0; i < result.length; i++) {
+          parts.push(cols.map(c => {
+            const v = String(result[i][c] ?? '')
+            return v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v
+          }).join(',') + '\n')
+          if (i % 50000 === 0) await yieldToMain()
+        }
+        const blob = new Blob(parts, { type: 'text/csv;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `站址合并_${dateStr}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+      } else {
+        addLog('导出 Excel...')
+        const XLSX = await import('xlsx')
+        const ws = XLSX.utils.json_to_sheet(result)
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, '合并结果')
+        const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+        const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `站址合并_${dateStr}.xlsx`
+        a.click()
+        URL.revokeObjectURL(url)
+      }
 
       setDone(true)
       addLog('处理完成！')
