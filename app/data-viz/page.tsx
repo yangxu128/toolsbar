@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { BarChart3, UploadCloud, Download, Home, Star, ChevronRight, X, TrendingUp, BarChart2, PieChart, Activity, Grid3X3, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, Settings2, Info } from 'lucide-react'
+import { BarChart3, Download, Home, Star, ChevronRight, X, TrendingUp, BarChart2, PieChart, Activity, Grid3X3, AlertCircle, CheckCircle2, Loader2, Settings2, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
+import UploadPanel from '@/components/upload-panel'
 
 type ChartType = 'line' | 'bar' | 'pie' | 'scatter' | 'area'
 
@@ -61,8 +62,6 @@ export default function DataVizPage() {
     showLabels: true,
     colorScheme: 'default',
   })
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
   const addLog = useCallback((msg: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`])
   }, [])
@@ -111,11 +110,9 @@ export default function DataVizPage() {
     return { headers, rows }
   }, [])
 
-  const handleUpload = useCallback(async (files: FileList) => {
+  const handleUpload = useCallback(async (file: File) => {
     setProcessing(true)
     setLogs([])
-    const file = files[0]
-    if (!file) { setProcessing(false); return }
 
     try {
       const text = await file.text()
@@ -267,24 +264,7 @@ export default function DataVizPage() {
         <div className="p-6 sm:p-8">
           {data.length === 0 ? (
             <div className="max-w-2xl mx-auto">
-              <div onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors border-[hsl(var(--border))] hover:border-[hsl(var(--primary))]">
-                <input ref={fileInputRef} type="file" accept=".csv" onChange={(e) => e.target.files && handleUpload(e.target.files)} className="hidden" />
-                <div className="w-16 h-16 rounded-2xl bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center mx-auto mb-4">
-                  {processing ? <Loader2 className="w-8 h-8 text-orange-600 animate-spin" /> : <FileSpreadsheet className="w-8 h-8 text-orange-600" />}
-                </div>
-                <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] mb-2">
-                  {processing ? '正在解析...' : '上传 CSV 数据文件'}
-                </h3>
-                <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
-                  {processing ? '请稍候' : '支持拖拽上传，最大5000行'}
-                </p>
-                {!processing && (
-                  <button className="px-4 py-2 bg-[hsl(var(--primary))] text-white rounded-lg font-medium text-sm hover:opacity-90 active:scale-[0.97] transition-all">
-                    选择文件
-                  </button>
-                )}
-              </div>
+              <UploadPanel onUpload={handleUpload} loading={processing} accept=".csv" title="点击或拖拽上传 CSV 数据文件" subtitle="支持 .csv 格式，最大 5000 行" />
 
               <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 mt-6">
                 <div className="flex items-center gap-2 mb-3">
@@ -469,7 +449,7 @@ export default function DataVizPage() {
                 </div>
               </div>
 
-              <button onClick={() => { setData([]); setHeaders([]); setLogs([]); if (fileInputRef.current) fileInputRef.current.value = '' }}
+              <button onClick={() => { setData([]); setHeaders([]); setLogs([]) }}
                 className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors">
                 <X className="w-3.5 h-3.5" /> 清除数据，重新上传
               </button>

@@ -2,9 +2,10 @@
 
 import { useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { Home, Star, ChevronRight as ChevronRightIcon, FileSpreadsheet, X, Loader2, CheckCircle2, AlertCircle, Settings2, Upload, RotateCcw, Download, Info } from 'lucide-react'
+import { Home, Star, ChevronRight as ChevronRightIcon, FileSpreadsheet, X, Loader2, CheckCircle2, AlertCircle, Settings2, RotateCcw, Download, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 import { useToastStore } from '@/lib/toast-store'
+import UploadPanel from '@/components/upload-panel'
 
 type Row = Record<string, any>
 
@@ -20,7 +21,6 @@ export default function SiteMergePage() {
   const [logs, setLogs] = useState<string[]>([])
   const [processing, setProcessing] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [dragging, setDragging] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
 
@@ -31,7 +31,6 @@ export default function SiteMergePage() {
   const [distance, setDistance] = useState(100)
   const [separate, setSeparate] = useState(true)
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const cancelRef = useRef(false)
 
   const addLog = useCallback((msg: string) => {
@@ -101,12 +100,6 @@ export default function SiteMergePage() {
     } catch (e: any) {
       toast(`模板下载失败: ${e.message}`, 'error')
     }
-  }
-
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    const f = e.dataTransfer.files[0]
-    if (f) handleFile(f)
   }
 
   const yieldToMain = () => new Promise(r => setTimeout(r, 0))
@@ -357,24 +350,7 @@ export default function SiteMergePage() {
 
       {!rows.length ? (
         <div className="space-y-4">
-          <div
-            onDrop={onDrop}
-            onDragOver={e => { e.preventDefault(); setDragging(true) }}
-            onDragLeave={() => setDragging(false)}
-            className={`bg-[hsl(var(--card))] rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-300 ${
-              dragging
-                ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)] scale-[1.02] shadow-lg shadow-[hsl(var(--primary))]/10'
-                : 'border-[hsl(var(--border))] hover:border-[hsl(var(--ring)/0.4)] hover:shadow-md'
-            } ${loading ? 'pointer-events-none opacity-60' : ''}`}
-            onClick={() => !loading && fileInputRef.current?.click()}
-          >
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
-            <div className={`w-16 h-16 rounded-2xl bg-[hsl(var(--primary))] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[hsl(var(--primary))]/30 transition-transform duration-300 ${dragging ? 'scale-110' : ''}`}>
-              {loading ? <Loader2 className="w-8 h-8 text-white animate-spin" /> : <Upload className="w-8 h-8 text-white" />}
-            </div>
-            <p className="text-base font-medium text-[hsl(var(--foreground))] mb-1">{loading ? '正在读取文件...' : '点击或拖拽上传 Excel 文件'}</p>
-            <p className="text-sm text-[hsl(var(--muted-foreground))]">支持 .xlsx / .xls 格式，文件大小限制 10MB</p>
-          </div>
+          <UploadPanel onUpload={handleFile} loading={loading} accept=".xlsx,.xls" title="点击或拖拽上传 Excel 文件" subtitle="支持 .xlsx / .xls 格式，文件大小限制 10MB" />
 
           <div className="flex justify-center">
             <button onClick={handleDownloadTemplate} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.08)] hover:bg-[hsl(var(--primary)/0.15)] active:scale-95 transition-all">

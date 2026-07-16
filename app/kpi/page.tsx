@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Upload, FileSpreadsheet, Calculator, GitCompareArrows, Home, ChevronRight, Star, Loader2, RotateCcw, Info } from 'lucide-react'
+import { Upload, FileSpreadsheet, Calculator, GitCompareArrows, Home, ChevronRight, Star, RotateCcw, Info } from 'lucide-react'
 import { useKpiStore } from '@/lib/store'
 import { parseExcel } from '@/lib/calc'
 import { useFavStore } from '@/lib/fav-store'
@@ -109,26 +109,20 @@ export default function KpiPage() {
 
           <div className="animate-scale-in">
             {activeKey === 'upload' && (
-              uploading ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-3 text-[hsl(var(--muted-foreground))]">
-                  <Loader2 className="w-8 h-8 animate-spin text-[hsl(var(--primary))]" />
-                  <span className="text-sm">正在解析文件...</span>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {loaded && (
-                    <div className="flex justify-end">
-                      <button
-                        onClick={handleClear}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] hover:border-[hsl(var(--primary))] transition-colors"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" /> 重新上传 / 清除数据
-                      </button>
-                    </div>
-                  )}
-                  <UploadPanel onUpload={handleUpload} />
+              <div className="space-y-4">
+                {loaded && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleClear}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] hover:border-[hsl(var(--primary))] transition-colors"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> 重新上传 / 清除数据
+                    </button>
+                  </div>
+                )}
+                <UploadPanel onUpload={handleUpload} loading={uploading} title="点击或拖拽上传 Excel 文件" subtitle="支持 .xlsx / .xls 格式" hint="需包含 Sheet0（数据）和 指标(计数器)（公式定义）" />
 
-                  <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5">
+                <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5">
                     <div className="flex items-center gap-2 mb-3">
                       <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
                       <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
@@ -148,7 +142,6 @@ export default function KpiPage() {
                     </div>
                   </div>
                 </div>
-              )
             )}
             {activeKey === 'data' && loaded && <DataTable />}
             {activeKey === 'metrics' && loaded && <MetricTable />}

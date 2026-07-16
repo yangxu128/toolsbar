@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { FileSpreadsheet, X, Home, Star, ChevronRight as ChevronRightIcon, GitMerge, CheckCircle2, AlertCircle, Loader2, Ban, Trash2, Info } from 'lucide-react'
+import { UploadCloud, FileSpreadsheet, X, Home, Star, ChevronRight as ChevronRightIcon, GitMerge, CheckCircle2, AlertCircle, Loader2, Ban, Info, Trash2 } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
 type Encoding = 'auto' | 'gbk' | 'utf8' | 'utf8bom'
@@ -213,36 +213,26 @@ export default function CsvMergePage() {
               </select>
             </div>
 
-            <div onClick={() => !processing && fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
-                processing ? 'opacity-60 cursor-not-allowed' : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary))] hover:bg-[hsl(var(--muted))]/50'
+            <div
+              onDragOver={(e) => { e.preventDefault(); }}
+              onDrop={(e) => { e.preventDefault(); if (!processing && e.dataTransfer.files?.length) handleUpload(e.dataTransfer.files) }}
+              onClick={() => !processing && fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-300 ${
+                processing ? 'opacity-60 cursor-not-allowed pointer-events-none' : 'border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-[hsl(var(--ring)/0.4)] hover:shadow-md'
               }`}>
               <input ref={fileInputRef} type="file" accept=".csv" multiple
                 onChange={(e) => e.target.files && e.target.files.length > 0 && handleUpload(e.target.files)} className="hidden" />
-              <div className="w-16 h-16 rounded-2xl bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center mx-auto mb-4">
-                {processing ? (
-                  <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
-                ) : (
-                  <FileSpreadsheet className="w-8 h-8 text-teal-600" />
-                )}
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[hsl(var(--primary))] flex items-center justify-center shadow-lg shadow-[hsl(var(--primary))]/30">
+                {processing ? <Loader2 className="w-8 h-8 text-white animate-spin" /> : <UploadCloud className="w-8 h-8 text-white" />}
               </div>
-              <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] mb-2">
-                {processing ? '正在合并文件...' : '拖拽多个 CSV 文件到此处'}
+              <h3 className="text-base font-medium text-[hsl(var(--foreground))] mb-1">
+                {processing ? '正在合并文件...' : '点击或拖拽上传多个 CSV 文件'}
               </h3>
-              <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">
                 {processing
                   ? (progress ? `正在处理第 ${progress.current}/${progress.total} 组，合并完成后自动下载` : '合并完成后自动下载，请勿关闭页面')
                   : '支持多选，按文件名前20位自动分组合并'}
               </p>
-              {!processing ? (
-                <button className="btn-primary bg-teal-500 hover:bg-teal-600">
-                  选择文件
-                </button>
-              ) : (
-                <button onClick={handleCancel} className="btn-primary bg-red-500 hover:bg-red-600 inline-flex items-center justify-center gap-2">
-                  <Ban className="w-4 h-4" /> 取消处理
-                </button>
-              )}
             </div>
 
             {completedGroups.length > 0 && (

@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { MapPin, UploadCloud, Home, Star, ChevronRight, X, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, Settings2, Eye, EyeOff, Search, RefreshCw, Info } from 'lucide-react'
+import { MapPin, Home, Star, ChevronRight, X, AlertCircle, CheckCircle2, Loader2, Settings2, Search, RefreshCw, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
+import UploadPanel from '@/components/upload-panel'
 
 interface CellData {
   lat: number
@@ -32,7 +33,6 @@ export default function CellMapPage() {
   const [nameCol, setNameCol] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [sectorRadius, setSectorRadius] = useState(0.3)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstance = useRef<any>(null)
   const layersRef = useRef<any[]>([])
@@ -177,11 +177,9 @@ export default function CellMapPage() {
     return ''
   }
 
-  const handleUpload = useCallback(async (files: FileList) => {
+  const handleUpload = useCallback(async (file: File) => {
     setProcessing(true)
     setLogs([])
-    const file = files[0]
-    if (!file) { setProcessing(false); return }
 
     try {
       const { headers, rows } = await parseExcel(file)
@@ -329,24 +327,7 @@ export default function CellMapPage() {
 
           {cells.length === 0 ? (
             <div className="max-w-2xl mx-auto">
-              <div onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors border-[hsl(var(--border))] hover:border-[hsl(var(--primary))]">
-                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={(e) => e.target.files && handleUpload(e.target.files)} className="hidden" />
-                <div className="w-16 h-16 rounded-2xl bg-green-50 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
-                  {processing ? <Loader2 className="w-8 h-8 text-green-600 animate-spin" /> : <FileSpreadsheet className="w-8 h-8 text-green-600" />}
-                </div>
-                <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] mb-2">
-                  {processing ? '正在解析...' : '上传 Excel 文件'}
-                </h3>
-                <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
-                  {processing ? '请稍候' : '支持 .xlsx / .xls 格式，自动识别经纬度和方位角'}
-                </p>
-                {!processing && (
-                  <button className="px-4 py-2 bg-[hsl(var(--primary))] text-white rounded-lg font-medium text-sm hover:opacity-90 active:scale-[0.97] transition-all">
-                    选择文件
-                  </button>
-                )}
-              </div>
+              <UploadPanel onUpload={handleUpload} loading={processing} accept=".xlsx,.xls" title="点击或拖拽上传 Excel 文件" subtitle="支持 .xlsx / .xls 格式，自动识别经纬度和方位角" />
 
               <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 mt-6">
                 <div className="flex items-center gap-2 mb-3">
@@ -447,7 +428,7 @@ export default function CellMapPage() {
                   className="flex items-center gap-1.5 px-4 py-2 bg-[hsl(var(--primary))] text-white text-sm font-medium rounded-md hover:opacity-90">
                   <MapPin className="w-3.5 h-3.5" /> 重新解析并展示
                 </button>
-                <button onClick={() => { setCells([]); rawRowsRef.current = []; setLogs([]); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                <button onClick={() => { setCells([]); rawRowsRef.current = []; setLogs([]) }}
                   className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors">
                   <X className="w-3.5 h-3.5" /> 清除数据
                 </button>

@@ -2,11 +2,12 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { UploadCloud, Download, FileCode, X, Home, Star, ChevronRight as ChevronRightIcon, XCircle, Info } from 'lucide-react'
+import { Download, FileCode, X, Home, Star, ChevronRight as ChevronRightIcon, XCircle, Info } from 'lucide-react'
 import { useXmlStore } from '@/lib/xml-store'
 import { parseXmlFile } from '@/lib/xml-parser'
 import { useFavStore } from '@/lib/fav-store'
 import UnifiedTable from '@/components/unified-table'
+import UploadPanel from '@/components/upload-panel'
 
 export default function XmlPage() {
   const loaded = useXmlStore((s) => s.loaded)
@@ -19,15 +20,17 @@ export default function XmlPage() {
   const fav = isFav('xml-reader')
   const [errorMsg, setErrorMsg] = useState('')
   const [exportName, setExportName] = useState('')
+  const [uploading, setUploading] = useState(false)
 
   const handleUpload = useCallback(async (file: File) => {
     setErrorMsg('')
+    setUploading(true)
     try {
       const text = await file.text()
       const result = parseXmlFile(text)
       loadXml(result.headers, result.data, file.name)
       setExportName(`xml_export_${new Date().toISOString().slice(0, 10)}`)
-    } catch (e: any) { setErrorMsg(e.message || '解析失败') }
+    } catch (e: any) { setErrorMsg(e.message || '解析失败') } finally { setUploading(false) }
   }, [loadXml])
 
   const handleExport = () => {
@@ -84,7 +87,38 @@ export default function XmlPage() {
 
         <div className="p-6 sm:p-8 min-h-[400px]">
           {!loaded ? (
-            <UploadArea onUpload={handleUpload} error={errorMsg} onCloseError={() => setErrorMsg('')} />
+            <div className="space-y-4">
+              <UploadPanel onUpload={handleUpload} loading={uploading} accept=".xml,.csv" title="点击或拖拽上传 XML / CSV 文件" subtitle="支持 .xml / .csv 格式" />
+              {errorMsg && (
+                <div className="error-state flex items-start justify-between gap-2">
+                  <span>{errorMsg}</span>
+                  <button onClick={() => setErrorMsg('')} className="shrink-0 hover:text-red-700 dark:hover:text-red-300 transition-colors" aria-label="关闭错误">
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+              <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+                  <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+                </div>
+                <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+                  <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>上传 XML 或 CSV 文件，自动识别常见结构并展示为表格，支持搜索、排序、分页和导出。</p>
+                  <p><strong className="text-[hsl(var(--foreground))]">支持格式：</strong></p>
+                  <div className="pl-4 space-y-1">
+                    <p>• <strong className="text-[hsl(var(--foreground))]">XML</strong>：自动识别 FieldName/FieldValue、smr/v、通用标签等多种结构</p>
+                    <p>• <strong className="text-[hsl(var(--foreground))]">CSV</strong>：表头和数据值用 | 符号分隔，如 字段名1|字段名2|...</p>
+                  </div>
+                  <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
+                  <div className="pl-4 space-y-1">
+                    <p>1. 点击上传区域或拖拽文件到虚线框内</p>
+                    <p>2. 系统自动解析并展示为表格</p>
+                    <p>3. 使用搜索框快速定位数据，分页浏览大量记录</p>
+                    <p>4. 点击「导出CSV」下载解析结果，点击「清除数据」可重新上传</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="animate-scale-in space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -125,59 +159,4 @@ export default function XmlPage() {
   )
 }
 
-function UploadArea({ onUpload, error, onCloseError }: { onUpload: (f: File) => void; error: string; onCloseError: () => void }) {
-  const [dragging, setDragging] = useState(false)
 
-  return (
-    <div className="max-w-2xl mx-auto">
-      <div onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f?.name.match(/\.(xml|csv)$/i)) onUpload(f) }}
-        onClick={() => document.getElementById('xml-file-input')?.click()}
-        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
-          dragging ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)]' : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary))] hover:bg-[hsl(var(--muted))]/50'
-        }`}>
-        <input id="xml-file-input" type="file" accept=".xml,.csv"
-          onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} className="hidden" />
-        <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-4">
-          <UploadCloud className="w-8 h-8 text-blue-600" />
-        </div>
-        <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] mb-2">拖拽 XML / CSV 文件到此处</h3>
-        <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">点击或拖拽 .xml / .csv 文件到此区域</p>
-        <button className="btn-primary bg-blue-500 hover:bg-blue-600">
-          选择文件
-        </button>
-      </div>
-      {error && (
-        <div className="error-state mt-3 flex items-start justify-between gap-2">
-          <span>{error}</span>
-          <button onClick={onCloseError} className="shrink-0 hover:text-red-700 dark:hover:text-red-300 transition-colors" aria-label="关闭错误">
-            <XCircle className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-      <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 mt-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
-          <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
-        </div>
-        <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
-          <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>上传 XML 或 CSV 文件，自动识别常见结构并展示为表格，支持搜索、排序、分页和导出。</p>
-          <p><strong className="text-[hsl(var(--foreground))]">支持格式：</strong></p>
-          <div className="pl-4 space-y-1">
-            <p>• <strong className="text-[hsl(var(--foreground))]">XML</strong>：自动识别 FieldName/FieldValue、smr/v、通用标签等多种结构</p>
-            <p>• <strong className="text-[hsl(var(--foreground))]">CSV</strong>：表头和数据值用 | 符号分隔，如 字段名1|字段名2|...</p>
-          </div>
-          <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
-          <div className="pl-4 space-y-1">
-            <p>1. 点击上传区域或拖拽文件到虚线框内</p>
-            <p>2. 系统自动解析并展示为表格</p>
-            <p>3. 使用搜索框快速定位数据，分页浏览大量记录</p>
-            <p>4. 点击「导出CSV」下载解析结果，点击「清除数据」可重新上传</p>
-          </div>
-          <p><strong className="text-[hsl(var(--foreground))]">输出结果：</strong>导出为 UTF-8 BOM 编码的 CSV 文件。</p>
-        </div>
-      </div>
-    </div>
-  )
-}

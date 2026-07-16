@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, Home, Star, ChevronRight as ChevronRightIcon, Upload, Download, Settings2, Loader2, CheckCircle2, AlertCircle, FileSpreadsheet, ChevronDown, ChevronUp, X, RotateCcw, Info } from 'lucide-react'
+import { AlertTriangle, Home, Star, ChevronRight as ChevronRightIcon, Download, Settings2, Loader2, CheckCircle2, AlertCircle, FileSpreadsheet, ChevronDown, ChevronUp, X, RotateCcw, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
+import UploadPanel from '@/components/upload-panel'
 
 interface VoiceThresholds {
   accessCnt: number
@@ -98,36 +99,13 @@ function toNum(v: any): number {
   return Number(v)
 }
 
-function FileUpload({ label, file, setFile, accept, required }: {
-  label: string, file: File | null, setFile: (f: File | null) => void, accept: string, required?: boolean
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <label className="text-sm font-medium text-[hsl(var(--foreground))] min-w-[180px]">
-        {required && <span className="text-red-500 mr-1">*</span>}{label}
-      </label>
-      <div className="flex-1 flex items-center gap-2">
-        <button onClick={() => {
-          const input = document.createElement('input')
-          input.type = 'file'
-          input.accept = accept
-          input.onchange = (e: any) => setFile(e.target.files?.[0] || null)
-          input.click()
-        }} className="px-4 py-2 rounded-lg border border-[hsl(var(--border))] text-sm hover:border-[hsl(var(--primary))] transition-colors bg-white dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
-          选择文件
-        </button>
-        {file && (
-          <div className="flex items-center gap-1 text-xs text-emerald-600">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span className="truncate max-w-[200px]">{file.name}</span>
-            <button onClick={() => setFile(null)} className="text-[hsl(var(--muted-foreground))] hover:text-red-500 ml-1">
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
+function detectFileRole(headers: string[]): 'quality' | 'highload' | 'cellinfo' | null {
+  const hs = headers.map(h => String(h).toLowerCase())
+  const has = (kws: string[]) => kws.some(kw => hs.some(h => h.includes(kw.toLowerCase())))
+  if (has(['VoNR语音建立请求', 'VONR语音建立请求', 'RRC连接建立请求次数', '无线接入成功率'])) return 'quality'
+  if (has(['下行PRB平均占用率', 'RRC连接平均连接用户数'])) return 'highload'
+  if (has(['carrierBandwidth', 'aauChannel', 'duplexMode'])) return 'cellinfo'
+  return null
 }
 
 export default function CellAnalysisPage() {
@@ -147,6 +125,7 @@ export default function CellAnalysisPage() {
   const [resultSummary, setResultSummary] = useState<string>('')
   const [resultBlob, setResultBlob] = useState<Blob | null>(null)
   const [progress, setProgress] = useState(0)
+  const [uploading, setUploading] = useState(false)
   const cancelRef = useRef(false)
 
   useEffect(() => {
@@ -174,6 +153,30 @@ export default function CellAnalysisPage() {
   const addLog = useCallback((msg: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`])
   }, [])
+
+  const handleUploadMultiple = useCallback(async (files: FileList) => {
+    setUploading(true)
+    setLogs([])
+    try {
+      const XLSX = await import('xlsx')
+      for (const file of Array.from(files)) {
+        const buf = await file.arrayBuffer()
+        const wb = XLSX.read(buf, { type: 'array' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
+        const headers = (raw[0] || []).map((h: any) => String(h || ''))
+        const role = detectFileRole(headers)
+        if (role === 'quality') { setQualityFile(file); addLog(`已识别质差类指标文件：${file.name}`) }
+        else if (role === 'highload') { setHighloadFile(file); addLog(`已识别高负荷指标文件：${file.name}`) }
+        else if (role === 'cellinfo') { setCellInfoFile(file); addLog(`已识别小区基础信息文件：${file.name}`) }
+        else { addLog(`未能识别文件类型：${file.name}，请按顺序上传`) }
+      }
+    } catch (e: any) {
+      addLog(`读取失败：${e.message}`)
+    } finally {
+      setUploading(false)
+    }
+  }, [addLog])
 
   const handleRun = useCallback(async () => {
     if (!qualityFile || !highloadFile) {
@@ -585,10 +588,47 @@ export default function CellAnalysisPage() {
           <div className="max-w-3xl mx-auto space-y-6">
             {/* 文件上传 */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-[hsl(var(--foreground))]">上传数据文件</h3>
-              <FileUpload label="质差类指标文件（Excel）" file={qualityFile} setFile={setQualityFile} accept=".xlsx,.xls" required />
-              <FileUpload label="高负荷指标文件（Excel）" file={highloadFile} setFile={setHighloadFile} accept=".xlsx,.xls" required />
-              <FileUpload label="小区基础信息（Excel，可选）" file={cellInfoFile} setFile={setCellInfoFile} accept=".xlsx,.xls" />
+              <UploadPanel
+                onUploadMultiple={handleUploadMultiple}
+                loading={uploading}
+                accept=".xlsx,.xls"
+                multiple
+                title="点击或拖拽上传数据文件"
+                subtitle="支持同时选择多个 Excel 文件，系统将自动识别文件类型"
+                hint="依次上传：质差类指标文件、高负荷指标文件、小区基础信息文件（可选）"
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+                  <div className="text-xs text-[hsl(var(--muted-foreground))] mb-1">质差类指标文件 <span className="text-red-500">*</span></div>
+                  {qualityFile ? (
+                    <div className="flex items-center gap-1.5 text-xs text-[hsl(var(--foreground))]">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="truncate" title={qualityFile.name}>{qualityFile.name}</span>
+                      <button onClick={() => setQualityFile(null)} className="text-[hsl(var(--muted-foreground))] hover:text-red-500 ml-auto"><X className="w-3 h-3" /></button>
+                    </div>
+                  ) : <span className="text-xs text-[hsl(var(--muted-foreground))]">未上传</span>}
+                </div>
+                <div className="p-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+                  <div className="text-xs text-[hsl(var(--muted-foreground))] mb-1">高负荷指标文件 <span className="text-red-500">*</span></div>
+                  {highloadFile ? (
+                    <div className="flex items-center gap-1.5 text-xs text-[hsl(var(--foreground))]">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="truncate" title={highloadFile.name}>{highloadFile.name}</span>
+                      <button onClick={() => setHighloadFile(null)} className="text-[hsl(var(--muted-foreground))] hover:text-red-500 ml-auto"><X className="w-3 h-3" /></button>
+                    </div>
+                  ) : <span className="text-xs text-[hsl(var(--muted-foreground))]">未上传</span>}
+                </div>
+                <div className="p-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+                  <div className="text-xs text-[hsl(var(--muted-foreground))] mb-1">小区基础信息（可选）</div>
+                  {cellInfoFile ? (
+                    <div className="flex items-center gap-1.5 text-xs text-[hsl(var(--foreground))]">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="truncate" title={cellInfoFile.name}>{cellInfoFile.name}</span>
+                      <button onClick={() => setCellInfoFile(null)} className="text-[hsl(var(--muted-foreground))] hover:text-red-500 ml-auto"><X className="w-3 h-3" /></button>
+                    </div>
+                  ) : <span className="text-xs text-[hsl(var(--muted-foreground))]">未上传</span>}
+                </div>
+              </div>
             </div>
 
             {/* 阈值设置 */}
