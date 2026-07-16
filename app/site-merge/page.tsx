@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { Home, Star, ChevronRight as ChevronRightIcon, FileSpreadsheet, X, Loader2, CheckCircle2, AlertCircle, Settings2, Upload, RotateCcw } from 'lucide-react'
+import { Home, Star, ChevronRight as ChevronRightIcon, FileSpreadsheet, X, Loader2, CheckCircle2, AlertCircle, Settings2, Upload, RotateCcw, Download, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 import { useToastStore } from '@/lib/toast-store'
 
@@ -73,6 +73,33 @@ export default function SiteMergePage() {
       toast(`读取失败: ${e.message}`, 'error')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const XLSX = await import('xlsx')
+      const template = [
+        { '物理站址标识': '站点001', '经度': 120.1551, '纬度': 30.2741, '覆盖类型': '宏站', '小区名称': '杭州西湖站点001' },
+        { '物理站址标识': '站点002', '经度': 120.1560, '纬度': 30.2745, '覆盖类型': '宏站', '小区名称': '杭州西湖站点002' },
+        { '物理站址标识': '站点003', '经度': 120.2000, '纬度': 30.3000, '覆盖类型': '室分', '小区名称': '杭州滨江站点003' },
+        { '物理站址标识': '站点004', '经度': 120.2010, '纬度': 30.3008, '覆盖类型': '室分', '小区名称': '杭州滨江站点004' },
+      ]
+      const ws = XLSX.utils.json_to_sheet(template)
+      ws['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 24 }]
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '站址数据')
+      const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+      const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = '物理站址合并_模板.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+      toast('模板下载成功', 'success')
+    } catch (e: any) {
+      toast(`模板下载失败: ${e.message}`, 'error')
     }
   }
 
@@ -306,23 +333,57 @@ export default function SiteMergePage() {
       </div>
 
       {!rows.length ? (
-        <div
-          onDrop={onDrop}
-          onDragOver={e => { e.preventDefault(); setDragging(true) }}
-          onDragLeave={() => setDragging(false)}
-          className={`bg-[hsl(var(--card))] rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-300 ${
-            dragging
-              ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)] scale-[1.02] shadow-lg shadow-[hsl(var(--primary))]/10'
-              : 'border-[hsl(var(--border))] hover:border-[hsl(var(--ring)/0.4)] hover:shadow-md'
-          } ${loading ? 'pointer-events-none opacity-60' : ''}`}
-          onClick={() => !loading && fileInputRef.current?.click()}
-        >
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
-          <div className={`w-16 h-16 rounded-2xl bg-[hsl(var(--primary))] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[hsl(var(--primary))]/30 transition-transform duration-300 ${dragging ? 'scale-110' : ''}`}>
-            {loading ? <Loader2 className="w-8 h-8 text-white animate-spin" /> : <Upload className="w-8 h-8 text-white" />}
+        <div className="space-y-4">
+          <div
+            onDrop={onDrop}
+            onDragOver={e => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={() => setDragging(false)}
+            className={`bg-[hsl(var(--card))] rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-300 ${
+              dragging
+                ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)] scale-[1.02] shadow-lg shadow-[hsl(var(--primary))]/10'
+                : 'border-[hsl(var(--border))] hover:border-[hsl(var(--ring)/0.4)] hover:shadow-md'
+            } ${loading ? 'pointer-events-none opacity-60' : ''}`}
+            onClick={() => !loading && fileInputRef.current?.click()}
+          >
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+            <div className={`w-16 h-16 rounded-2xl bg-[hsl(var(--primary))] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[hsl(var(--primary))]/30 transition-transform duration-300 ${dragging ? 'scale-110' : ''}`}>
+              {loading ? <Loader2 className="w-8 h-8 text-white animate-spin" /> : <Upload className="w-8 h-8 text-white" />}
+            </div>
+            <p className="text-base font-medium text-[hsl(var(--foreground))] mb-1">{loading ? '正在读取文件...' : '点击或拖拽上传 Excel 文件'}</p>
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">支持 .xlsx / .xls 格式，文件大小限制 10MB</p>
           </div>
-          <p className="text-base font-medium text-[hsl(var(--foreground))] mb-1">{loading ? '正在读取文件...' : '点击或拖拽上传 Excel 文件'}</p>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">支持 .xlsx / .xls 格式，文件大小限制 10MB</p>
+
+          <div className="flex justify-center">
+            <button onClick={handleDownloadTemplate} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.08)] hover:bg-[hsl(var(--primary)/0.15)] active:scale-95 transition-all">
+              <Download className="w-4 h-4" />下载模板
+            </button>
+          </div>
+
+          <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+              <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+            </div>
+            <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+              <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>基于经纬度距离合并邻近的物理站址，生成新的站址标签。距离小于阈值的站址将被合并为同一物理站址。</p>
+              <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong>Excel 文件需包含以下列（列名可在上传后手动选择）：</p>
+              <div className="pl-4 space-y-1">
+                <p>• <strong className="text-[hsl(var(--foreground))]">物理站址标识</strong>：站点的唯一标识（必填）</p>
+                <p>• <strong className="text-[hsl(var(--foreground))]">经度</strong>：站点经度坐标（必填）</p>
+                <p>• <strong className="text-[hsl(var(--foreground))]">纬度</strong>：站点纬度坐标（必填）</p>
+                <p>• <strong className="text-[hsl(var(--foreground))]">覆盖类型</strong>：宏站 / 室分（区分处理时必填）</p>
+              </div>
+              <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
+              <div className="pl-4 space-y-1">
+                <p>1. 点击上方区域上传 Excel 文件，或先下载模板按格式填写数据</p>
+                <p>2. 上传后系统自动识别列名，可在下拉框中手动调整</p>
+                <p>3. 设置合并距离阈值（默认 100 米）</p>
+                <p>4. 勾选「区分宏站/室分」可分别处理两类站点</p>
+                <p>5. 点击「开始合并」，处理完成后自动下载结果文件</p>
+              </div>
+              <p><strong className="text-[hsl(var(--foreground))]">输出结果：</strong>在原数据基础上新增「新物理站址标签」列，格式为「宏站-1」「室分-1」等。</p>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="space-y-6 animate-scale-in">
