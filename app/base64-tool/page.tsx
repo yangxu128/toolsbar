@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { FileCode, Home, Star, ChevronRight as ChevronRightIcon, Copy, Check, ArrowRightLeft, Upload } from 'lucide-react'
+import { FileCode, Home, Star, ChevronRight as ChevronRightIcon, Copy, Check, ArrowRightLeft, Upload, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
 type Mode = 'encode' | 'decode'
@@ -172,11 +172,27 @@ export default function Base64ToolPage() {
             {mode === 'encode' ? '编码' : '解码'}
           </button>
 
-          <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-[11px] text-[hsl(var(--muted-foreground))] space-y-1">
-            <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
-            <p>• 编码：将文本或文件转为Base64字符串，支持中文</p>
-            <p>• 解码：将Base64字符串还原为文本</p>
-            <p>• 支持上传图片文件，自动生成Base64并预览</p>
+          <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 mt-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+              <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+            </div>
+            <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+              <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>文本与文件的 Base64 编码/解码工具，支持 URL Safe 模式和图片预览。</p>
+              <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong></p>
+              <div className="pl-4 space-y-1">
+                <p>• <strong className="text-[hsl(var(--foreground))]">编码</strong>：输入任意文本，或上传图片/PDF/TXT 文件</p>
+                <p>• <strong className="text-[hsl(var(--foreground))]">解码</strong>：输入标准 Base64 字符串，支持 URL Safe 变体</p>
+              </div>
+              <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
+              <div className="pl-4 space-y-1">
+                <p>1. 选择「编码」或「解码」模式</p>
+                <p>2. 输入文本，或点击「上传文件」选择文件</p>
+                <p>3. 编码时可勾选 URL Safe，将 +/ 替换为 -_ 并去掉等号</p>
+                <p>4. 点击「编码」或「解码」按钮，查看输出结果</p>
+              </div>
+              <p><strong className="text-[hsl(var(--foreground))]">输出结果：</strong>编码输出 Base64 字符串；解码还原原始文本；图片文件支持实时预览。</p>
+            </div>
           </div>
         </div>
       </div>

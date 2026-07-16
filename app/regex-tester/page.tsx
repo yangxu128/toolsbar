@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { Search, Home, Star, ChevronRight as ChevronRightIcon, Copy, Check } from 'lucide-react'
+import { Search, Home, Star, ChevronRight as ChevronRightIcon, Copy, Check, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
 const presets = [
@@ -250,12 +250,24 @@ export default function RegexTesterPage() {
             </div>
           )}
 
-          <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-[11px] text-[hsl(var(--muted-foreground))] space-y-1">
-            <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
-            <p>• 输入正则表达式和测试文本，实时显示匹配结果</p>
-            <p>• 支持匹配、替换、分割三种模式</p>
-            <p>• 点击预设快速填入常用正则</p>
-            <p>• 替换模式支持 $1, $2 等捕获组引用</p>
+          <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 mt-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+              <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+            </div>
+            <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+              <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>实时正则表达式匹配测试工具，支持匹配、替换、分割三种模式。</p>
+              <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong>正则表达式输入在 /.../ 之间，标志位支持 g（全局）、i（忽略大小写）、m（多行）、s（单行）。</p>
+              <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
+              <div className="pl-4 space-y-1">
+                <p>1. 输入正则表达式，选择需要的标志位</p>
+                <p>2. 点击预设快速填入常用正则（邮箱、手机号、URL 等）</p>
+                <p>3. 在测试文本框中输入待匹配内容</p>
+                <p>4. 切换匹配/替换/分割模式查看不同结果</p>
+                <p>5. 替换模式支持 $1, $2 等捕获组引用</p>
+              </div>
+              <p><strong className="text-[hsl(var(--foreground))]">输出结果：</strong>高亮显示匹配内容、匹配位置列表、捕获组、替换/分割后的字符串。</p>
+            </div>
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, Home, Star, ChevronRight as ChevronRightIcon, Upload, Download, Settings2, Loader2, CheckCircle2, AlertCircle, FileSpreadsheet, ChevronDown, ChevronUp, X, RotateCcw } from 'lucide-react'
+import { AlertTriangle, Home, Star, ChevronRight as ChevronRightIcon, Upload, Download, Settings2, Loader2, CheckCircle2, AlertCircle, FileSpreadsheet, ChevronDown, ChevronUp, X, RotateCcw, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
 interface VoiceThresholds {
@@ -742,21 +742,31 @@ export default function CellAnalysisPage() {
               </div>
             )}
 
-            {/* 使用说明 */}
-            <div className="p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))] space-y-2">
-              <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
-              <div className="text-[11px] space-y-1">
+            <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+                <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+              </div>
+              <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+                <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>综合语音质差、5G通用质差、高负荷小区三类指标分析，自动输出质差小区清单和地市汇总。</p>
                 <p><strong className="text-[hsl(var(--foreground))]">必传文件：</strong></p>
-                <p>• 质差类指标文件（Excel）：包含VoNR语音指标和5G通用指标，粒度为自定义全时间</p>
-                <p>• 高负荷指标文件（Excel）：包含PRB占用率、流量、用户数等指标，粒度为1小时</p>
+                <div className="pl-4 space-y-1">
+                  <p>• <strong className="text-[hsl(var(--foreground))]">质差类指标文件（Excel）</strong>：包含 VoNR 语音指标和 5G 通用指标，粒度为自定义全时间</p>
+                  <p>• <strong className="text-[hsl(var(--foreground))]">高负荷指标文件（Excel）</strong>：包含 PRB 占用率、流量、用户数等指标，粒度为 1 小时</p>
+                </div>
                 <p><strong className="text-[hsl(var(--foreground))]">可选文件：</strong></p>
-                <p>• 小区基础信息（Excel）：包含masterOperatorId、carrierBandwidth、aauChannel、duplexMode字段</p>
-                <p><strong className="text-[hsl(var(--foreground))]">自动识别列名：</strong>系统会自动匹配包含关键字的列名，无需手动指定</p>
-                <p><strong className="text-[hsl(var(--foreground))]">输出内容：</strong></p>
-                <p>• 语音质差小区详细（低接通/高掉线/低切换/高丢包）</p>
-                <p>• 5G质差小区详细（低速率/低接入/高掉线）</p>
-                <p>• 高负荷小区详细（按频段+天线类型判断）</p>
-                <p>• 地市汇总统计 + 高负荷类型分布</p>
+                <div className="pl-4 space-y-1">
+                  <p>• <strong className="text-[hsl(var(--foreground))]">小区基础信息（Excel）</strong>：包含 masterOperatorId、carrierBandwidth、aauChannel、duplexMode 字段，用于速率门限计算</p>
+                </div>
+                <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
+                <div className="pl-4 space-y-1">
+                  <p>1. 上传必传的质差类和高负荷指标文件</p>
+                  <p>2. 可选上传小区基础信息文件</p>
+                  <p>3. 展开「阈值配置」调整语音、5G、高负荷门限（默认已设）</p>
+                  <p>4. 点击「开始分析」，等待进度完成</p>
+                  <p>5. 查看分析结果摘要并下载 Excel 报告</p>
+                </div>
+                <p><strong className="text-[hsl(var(--foreground))]">输出结果：</strong>语音质差小区详细、5G质差小区详细、高负荷小区详细、地市汇总统计、高负荷类型分布。</p>
               </div>
             </div>
           </div>

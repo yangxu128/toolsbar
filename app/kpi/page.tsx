@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Upload, FileSpreadsheet, Calculator, GitCompareArrows, Home, ChevronRight, Star, Loader2, RotateCcw } from 'lucide-react'
+import { Upload, FileSpreadsheet, Calculator, GitCompareArrows, Home, ChevronRight, Star, Loader2, RotateCcw, Info } from 'lucide-react'
 import { useKpiStore } from '@/lib/store'
 import { parseExcel } from '@/lib/calc'
 import { useFavStore } from '@/lib/fav-store'
@@ -127,6 +127,26 @@ export default function KpiPage() {
                     </div>
                   )}
                   <UploadPanel onUpload={handleUpload} />
+
+                  <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+                      <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+                    </div>
+                    <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+                      <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>上传 Excel 指标文件，自动解析指标公式并计算结果，支持多行对比分析。</p>
+                      <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong>Excel 文件，第一行为表头，后续行为指标数据，列名建议包含中文指标名。</p>
+                      <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
+                      <div className="pl-4 space-y-1">
+                        <p>1. 在「文件上传」页签点击上传区域，选择 Excel 文件</p>
+                        <p>2. 上传成功后自动切换到「原始数据」查看解析结果</p>
+                        <p>3. 在「指标公式」页签查看自动识别出的计算公式</p>
+                        <p>4. 在「指标计算」页签查看各指标计算结果</p>
+                        <p>5. 在「指标对比」页签选择多行进行差异对比</p>
+                      </div>
+                      <p><strong className="text-[hsl(var(--foreground))]">输出结果：</strong>原始数据表、公式列表、计算结果表、对比分析表。</p>
+                    </div>
+                  </div>
                 </div>
               )
             )}

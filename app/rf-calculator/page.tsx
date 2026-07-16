@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Home, ChevronRight as ChevronRightIcon, Star, Radio, Signal, Building2, TowerControl, BookOpen, Copy, Check, Search, ChevronDown } from 'lucide-react'
+import { Home, ChevronRight as ChevronRightIcon, Star, Radio, Signal, Building2, TowerControl, BookOpen, Copy, Check, Search, ChevronDown, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 import {
   LTE_BANDS, NR_BANDS, calcLteFreq, calcLteEarfcn, calcNrFreq, calcNrArfcn,
@@ -58,16 +58,22 @@ export default function RfCalculatorPage() {
         </div>
 
         <div className="p-6 sm:p-8">
-          <div className="mb-4 p-4 rounded-xl bg-[hsl(var(--muted))] border border-[hsl(var(--border))] space-y-2">
-            <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
-            <div className="text-[11px] text-[hsl(var(--muted-foreground))] space-y-1">
-              <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>4G/5G 无线通信参数查询与换算工具</p>
-              <p>• LTE EARFCN：EARFCN 与中心频率互转，支持 Band 查询</p>
-              <p>• 5G NR-ARFCN：NR-ARFCN 与频率互转，支持全局栅格计算</p>
-              <p>• 4G ECI：ECI 编解码，eNB ID + Cell ID ↔ ECI</p>
-              <p>• 5G NCI：NCI 编解码，gNB ID + Cell ID ↔ NCI（支持自定义位长）</p>
-              <p>• 频段参考：完整的 LTE/5G 频段参数速查表</p>
-              <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong>选择对应 Tab，输入参数后点击计算，结果实时显示在下方</p>
+          <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+              <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+            </div>
+            <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+              <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>4G/5G 无线通信参数查询与换算工具，支持 EARFCN、NR-ARFCN、ECI、NCI 和频段参考。</p>
+              <p><strong className="text-[hsl(var(--foreground))]">各 Tab 功能：</strong></p>
+              <div className="pl-4 space-y-1">
+                <p>• <strong className="text-[hsl(var(--foreground))]">LTE EARFCN</strong>：EARFCN 与中心频率互转，支持 Band 查询</p>
+                <p>• <strong className="text-[hsl(var(--foreground))]">5G NR-ARFCN</strong>：NR-ARFCN 与 SSB 频率互转，支持全局栅格计算</p>
+                <p>• <strong className="text-[hsl(var(--foreground))]">4G ECI</strong>：ECI 编解码，eNB ID + Cell ID ↔ ECI</p>
+                <p>• <strong className="text-[hsl(var(--foreground))]">5G NCI</strong>：NCI 编解码，gNB ID + Cell ID ↔ NCI，支持自定义 gNB ID 位长</p>
+                <p>• <strong className="text-[hsl(var(--foreground))]">频段参考</strong>：完整的 LTE/5G 频段参数速查表</p>
+              </div>
+              <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong>选择对应 Tab，输入参数后点击计算，结果实时显示在下方；点击结果旁的复制按钮可复制数值。</p>
             </div>
           </div>
 

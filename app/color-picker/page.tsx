@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { Palette, Home, Star, ChevronRight as ChevronRightIcon, Copy, Check } from 'lucide-react'
+import { Palette, Home, Star, ChevronRight as ChevronRightIcon, Copy, Check, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -303,11 +303,24 @@ export default function ColorPickerPage() {
             </div>
           </div>
 
-          <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-[11px] text-[hsl(var(--muted-foreground))] space-y-1">
-            <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
-            <p>• 点击色块或输入HEX/RGB/HSL值选择颜色</p>
-            <p>• 自动生成同色相不同明度的10色色板</p>
-            <p>• 对比度检查基于WCAG 2.0标准（AA级4.5:1，大字3:1）</p>
+          <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 mt-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+              <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+            </div>
+            <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+              <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>HEX / RGB / HSL 颜色互转，生成色板、配色方案，并检查 WCAG 对比度。</p>
+              <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong>支持 HEX（#3b82f6）、RGB（rgb(59,130,246)）、HSL（hsl(217,91%,60%)）三种格式输入。</p>
+              <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
+              <div className="pl-4 space-y-1">
+                <p>1. 点击色块选择颜色，或直接输入 HEX/RGB/HSL 值</p>
+                <p>2. 查看自动生成的同色相 10 色色板</p>
+                <p>3. 查看互补色、类似色、三角配色方案</p>
+                <p>4. 检查与白色/黑色的对比度是否满足 AA 标准</p>
+                <p>5. 点击复制按钮复制颜色值，历史记录自动保存</p>
+              </div>
+              <p><strong className="text-[hsl(var(--foreground))]">输出结果：</strong>HEX、RGB、HSL 值，色板，配色方案，WCAG 对比度评级。</p>
+            </div>
           </div>
         </div>
       </div>

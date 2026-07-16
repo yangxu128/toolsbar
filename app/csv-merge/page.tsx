@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { FileSpreadsheet, X, Home, Star, ChevronRight as ChevronRightIcon, GitMerge, CheckCircle2, AlertCircle, Loader2, Ban, Trash2 } from 'lucide-react'
+import { FileSpreadsheet, X, Home, Star, ChevronRight as ChevronRightIcon, GitMerge, CheckCircle2, AlertCircle, Loader2, Ban, Trash2, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
 type Encoding = 'auto' | 'gbk' | 'utf8' | 'utf8bom'
@@ -265,18 +265,23 @@ export default function CsvMergePage() {
               </div>
             )}
 
-            <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))] space-y-2">
-              <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
-              <div className="text-[11px] space-y-1">
-                <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong>多个 CSV 文件，文件名前20位相同的会自动分为一组</p>
-                <p>• 编码支持：GBK、UTF-8、UTF-8 BOM、自动检测</p>
-                <p>• 分组规则：按文件名前20个字符匹配</p>
+            <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 mt-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+                <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+              </div>
+              <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+                <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>按文件名前20位自动分组，批量合并多个 CSV 文件，统一编码输出。</p>
+                <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong>多个 CSV 文件，文件名前20位相同的会自动分为一组。</p>
+                <p><strong className="text-[hsl(var(--foreground))]">编码支持：</strong>读取支持 GBK、UTF-8、UTF-8 BOM、自动检测；输出可选择 GBK、UTF-8、UTF-8 BOM。</p>
                 <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
-                <p>1. 选择读取编码和输出编码（默认 UTF-8 BOM）</p>
-                <p>2. 拖拽或选择多个 CSV 文件上传</p>
-                <p>3. 系统自动按文件名分组并合并</p>
-                <p>4. 每组合并完成后自动下载，无需等待全部完成</p>
-                <p>5. 无行数限制，大文件不会导致页面崩溃</p>
+                <div className="pl-4 space-y-1">
+                  <p>1. 选择读取编码和输出编码（默认 UTF-8 BOM）</p>
+                  <p>2. 拖拽或选择多个 CSV 文件上传</p>
+                  <p>3. 系统自动按文件名分组并合并</p>
+                  <p>4. 每组合并完成后自动下载，无需等待全部完成</p>
+                </div>
+                <p><strong className="text-[hsl(var(--foreground))]">输出结果：</strong>每组生成一个「文件名前缀合并.csv」文件，保留首行表头，合并后续数据行。</p>
               </div>
             </div>
           </div>

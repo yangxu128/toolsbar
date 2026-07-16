@@ -2,11 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
-import {
-  BarChart3, UploadCloud, Download, Home, Star, ChevronRight,
-  X, TrendingUp, BarChart2, PieChart, Activity, Grid3X3,
-  FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, Settings2
-} from 'lucide-react'
+import { BarChart3, UploadCloud, Download, Home, Star, ChevronRight, X, TrendingUp, BarChart2, PieChart, Activity, Grid3X3, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, Settings2, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
 type ChartType = 'line' | 'bar' | 'pie' | 'scatter' | 'area'
@@ -290,18 +286,23 @@ export default function DataVizPage() {
                 )}
               </div>
 
-              <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] border border-[hsl(var(--border))] space-y-2">
-                <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
-                <div className="text-[11px] text-[hsl(var(--muted-foreground))] space-y-1">
-                  <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong>CSV 文件，第一行为表头</p>
-                  <p>• 支持数值列自动识别，用于图表纵轴</p>
-                  <p>• 最大支持 5000 行数据，超限自动截断</p>
+              <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 mt-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+                  <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+                </div>
+                <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+                  <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>上传 CSV 数据文件，一键生成折线图、柱状图、饼图、散点图、面积图。</p>
+                  <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong>CSV 文件，第一行为表头，后续行为数据；数值列自动识别作为 Y 轴，最大支持 5000 行。</p>
                   <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
-                  <p>1. 准备 CSV 数据文件（可参考下方模板）</p>
-                  <p>2. 上传文件，系统自动解析列名和数据</p>
-                  <p>3. 选择图表类型、X轴、Y轴、分组字段</p>
-                  <p>4. 点击「图表设置」调整标题、颜色、尺寸等属性</p>
-                  <p>5. 图表实时渲染，支持导出 SVG</p>
+                  <div className="pl-4 space-y-1">
+                    <p>1. 准备 CSV 数据文件（可参考下方模板），点击上传区域选择文件</p>
+                    <p>2. 选择图表类型：折线、柱状、饼图、散点、面积</p>
+                    <p>3. 设置 X 轴（分类字段）、Y 轴（数值字段）、分组字段（可选）</p>
+                    <p>4. 点击「图表设置」调整标题、尺寸、网格、图例、配色等属性</p>
+                    <p>5. 图表实时渲染，支持导出 SVG 或 PNG</p>
+                  </div>
+                  <p><strong className="text-[hsl(var(--foreground))]">输出结果：</strong>在线交互式图表，可导出 SVG/PNG 图片。</p>
                 </div>
               </div>
 

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { FileCode, Home, Star, ChevronRight as ChevronRightIcon, Copy, Check, Trash2, ArrowRightLeft, Upload } from 'lucide-react'
+import { FileCode, Home, Star, ChevronRight as ChevronRightIcon, Copy, Check, Trash2, ArrowRightLeft, Upload, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
 type Mode = 'format' | 'minify' | 'validate'
@@ -161,11 +161,23 @@ export default function JsonFormatterPage() {
             {{ format: '美化', minify: '压缩', validate: '校验' }[mode]}
           </button>
 
-          <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-[11px] text-[hsl(var(--muted-foreground))] space-y-1">
-            <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
-            <p>• 美化：格式化JSON，支持2空格/4空格/Tab缩进</p>
-            <p>• 压缩：移除所有空白，输出单行JSON</p>
-            <p>• 校验：检查JSON语法是否正确</p>
+          <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 mt-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+              <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+            </div>
+            <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+              <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>JSON 美化、压缩、校验工具，支持文件上传和结果复制。</p>
+              <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong>输入需为合法 JSON 字符串，支持对象、数组、字符串、数字等基本类型。</p>
+              <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
+              <div className="pl-4 space-y-1">
+                <p>1. 在左侧输入框粘贴 JSON 数据，或点击「上传」选择 .json 文件</p>
+                <p>2. 选择模式：美化（支持2空格/4空格/Tab缩进）、压缩、校验</p>
+                <p>3. 点击对应按钮处理，右侧显示结果</p>
+                <p>4. 点击「复制」导出结果，「交换」可将输出作为新输入</p>
+              </div>
+              <p><strong className="text-[hsl(var(--foreground))]">输出结果：</strong>美化后格式化的 JSON、压缩后的单行 JSON，或校验通过/失败提示。</p>
+            </div>
           </div>
         </div>
       </div>

@@ -2,11 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import {
-  MapPin, UploadCloud, Home, Star, ChevronRight,
-  X, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2,
-  Settings2, Eye, EyeOff, Search, RefreshCw
-} from 'lucide-react'
+import { MapPin, UploadCloud, Home, Star, ChevronRight, X, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, Settings2, Eye, EyeOff, Search, RefreshCw, Info } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 
 interface CellData {
@@ -352,19 +348,28 @@ export default function CellMapPage() {
                 )}
               </div>
 
-              <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] border border-[hsl(var(--border))] space-y-2">
-                <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
-                <div className="text-[11px] text-[hsl(var(--muted-foreground))] space-y-1">
-                  <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong>Excel 文件，需包含以下字段</p>
-                  <p>• 纬度字段：列名包含 lat / 纬度 / latitude / 纬</p>
-                  <p>• 经度字段：列名包含 lng / lon / 经度 / longitude / 经</p>
-                  <p>• 方位角字段：列名包含 azimuth / 方位角 / 方向角 / 方向</p>
-                  <p>• 小区名称：列名包含 name / 名称 / 小区名 / 基站名 / cell（可选）</p>
+              <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 mt-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+                  <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+                </div>
+                <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+                  <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>上传 Excel 小区信息文件，自动识别经纬度和方位角，在天地图上绘制小区位置和扇区覆盖。</p>
+                  <p><strong className="text-[hsl(var(--foreground))]">数据格式：</strong>Excel 文件，需包含以下字段（列名可自动识别）：</p>
+                  <div className="pl-4 space-y-1">
+                    <p>• <strong className="text-[hsl(var(--foreground))]">纬度</strong>：列名包含 lat / 纬度 / latitude / 纬（必填）</p>
+                    <p>• <strong className="text-[hsl(var(--foreground))]">经度</strong>：列名包含 lng / lon / 经度 / longitude / 经（必填）</p>
+                    <p>• <strong className="text-[hsl(var(--foreground))]">方位角</strong>：列名包含 azimuth / 方位角 / 方向角 / 方向（可选，默认0°）</p>
+                    <p>• <strong className="text-[hsl(var(--foreground))]">小区名称</strong>：列名包含 name / 名称 / 小区名 / 基站名 / cell（可选）</p>
+                  </div>
                   <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
-                  <p>1. 先配置天地图Key（点击上方「天地图Key配置」）</p>
-                  <p>2. 上传包含小区信息的Excel文件</p>
-                  <p>3. 系统自动识别字段并在地图上绘制扇区（65°）</p>
-                  <p>4. 如字段识别有误，可手动选择后重新解析</p>
+                  <div className="pl-4 space-y-1">
+                    <p>1. 先配置天地图 Key（点击上方「天地图Key配置」）</p>
+                    <p>2. 上传包含小区信息的 Excel 文件</p>
+                    <p>3. 系统自动识别字段并在地图上绘制扇区（65°，半径可调整）</p>
+                    <p>4. 如字段识别有误，可手动选择后点击「重新解析并展示」</p>
+                  </div>
+                  <p><strong className="text-[hsl(var(--foreground))]">输出结果：</strong>天地图上的小区位置标记和扇区覆盖图层，支持搜索筛选。</p>
                 </div>
               </div>
 

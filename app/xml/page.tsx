@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { UploadCloud, Download, FileCode, X, Home, Star, ChevronRight as ChevronRightIcon, XCircle } from 'lucide-react'
+import { UploadCloud, Download, FileCode, X, Home, Star, ChevronRight as ChevronRightIcon, XCircle, Info } from 'lucide-react'
 import { useXmlStore } from '@/lib/xml-store'
 import { parseXmlFile } from '@/lib/xml-parser'
 import { useFavStore } from '@/lib/fav-store'
@@ -156,16 +156,26 @@ function UploadArea({ onUpload, error, onCloseError }: { onUpload: (f: File) => 
           </button>
         </div>
       )}
-      <div className="mt-6 p-4 rounded-xl bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))] space-y-2">
-        <h4 className="text-xs font-semibold text-[hsl(var(--foreground))]">使用说明</h4>
-        <div className="text-[11px] space-y-1">
-          <p><strong className="text-[hsl(var(--foreground))]">支持格式：</strong>XML 文件 或 CSV 文件（| 分隔）</p>
-          <p>• XML：自动识别 FieldName/FieldValue、smr/v、通用标签等多种结构</p>
-          <p>• CSV：表头和数据值用 | 符号分隔，如 字段名1|字段名2|...</p>
+      <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5 mt-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Info className="w-4 h-4 text-[hsl(var(--primary))]" />
+          <span className="text-sm font-semibold text-[hsl(var(--foreground))]">使用说明</span>
+        </div>
+        <div className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+          <p><strong className="text-[hsl(var(--foreground))]">功能说明：</strong>上传 XML 或 CSV 文件，自动识别常见结构并展示为表格，支持搜索、排序、分页和导出。</p>
+          <p><strong className="text-[hsl(var(--foreground))]">支持格式：</strong></p>
+          <div className="pl-4 space-y-1">
+            <p>• <strong className="text-[hsl(var(--foreground))]">XML</strong>：自动识别 FieldName/FieldValue、smr/v、通用标签等多种结构</p>
+            <p>• <strong className="text-[hsl(var(--foreground))]">CSV</strong>：表头和数据值用 | 符号分隔，如 字段名1|字段名2|...</p>
+          </div>
           <p><strong className="text-[hsl(var(--foreground))]">操作步骤：</strong></p>
-          <p>1. 点击上传区域或拖拽文件到虚线框内</p>
-          <p>2. 系统自动解析并展示为表格，支持搜索、排序、分页</p>
-          <p>3. 可导出为 CSV 文件，点击「清除数据」可重新上传</p>
+          <div className="pl-4 space-y-1">
+            <p>1. 点击上传区域或拖拽文件到虚线框内</p>
+            <p>2. 系统自动解析并展示为表格</p>
+            <p>3. 使用搜索框快速定位数据，分页浏览大量记录</p>
+            <p>4. 点击「导出CSV」下载解析结果，点击「清除数据」可重新上传</p>
+          </div>
+          <p><strong className="text-[hsl(var(--foreground))]">输出结果：</strong>导出为 UTF-8 BOM 编码的 CSV 文件。</p>
         </div>
       </div>
     </div>
