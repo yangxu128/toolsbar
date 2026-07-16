@@ -18,7 +18,7 @@ const tabs = [
   { key: 'ref', label: '频段参考', icon: BookOpen },
 ]
 
-const inputClass = "form-input"
+const inputClass = "form-input w-full"
 const buttonClass = "btn-primary w-full"
 
 export default function RfCalculatorPage() {
