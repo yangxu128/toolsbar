@@ -110,6 +110,8 @@ export default function CellAnalysisPage() {
   const [logs, setLogs] = useState<string[]>([])
   const [processing, setProcessing] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [calcQuality, setCalcQuality] = useState(true)
+  const [calcHighload, setCalcHighload] = useState(true)
   const [voiceTh, setVoiceTh] = useState<VoiceThresholds>(defaultVoice)
   const [g5Th, setG5Th] = useState<G5Thresholds>(defaultG5)
   const [highLoadTh, setHighLoadTh] = useState<HighLoadThresholds>(defaultHighLoad)
@@ -145,8 +147,16 @@ export default function CellAnalysisPage() {
   }, [])
 
   const handleRun = useCallback(async () => {
-    if (!qualityFile || !highloadFile) {
-      addLog('请上传质差指标文件和高负荷指标文件')
+    if (calcQuality && !qualityFile) {
+      addLog('请上传质差类指标文件，或取消勾选质差计算')
+      return
+    }
+    if (calcHighload && !highloadFile) {
+      addLog('请上传高负荷指标文件，或取消勾选高负荷计算')
+      return
+    }
+    if (!calcQuality && !calcHighload) {
+      addLog('请至少选择一项计算内容')
       return
     }
     setProcessing(true)
@@ -158,23 +168,32 @@ export default function CellAnalysisPage() {
 
     try {
       const XLSX = await import('xlsx')
-      addLog('读取质差指标文件...')
-      setProgress(10)
-      await yieldToMain()
-      const qBuf = await qualityFile.arrayBuffer()
-      const qWb = XLSX.read(qBuf, { type: 'array' })
-      const qWs = qWb.Sheets[qWb.SheetNames[0]]
-      const qRaw: any[][] = XLSX.utils.sheet_to_json(qWs, { header: 1 })
-      const qHeaders: string[] = (qRaw[0] || []).map((h: any) => String(h || ''))
+      let qHeaders: string[] = []
+      let hHeaders: string[] = []
+      let qRaw: any[][] = []
+      let hRaw: any[][] = []
 
-      addLog('读取高负荷指标文件...')
-      setProgress(20)
-      await yieldToMain()
-      const hBuf = await highloadFile.arrayBuffer()
-      const hWb = XLSX.read(hBuf, { type: 'array' })
-      const hWs = hWb.Sheets[hWb.SheetNames[0]]
-      const hRaw: any[][] = XLSX.utils.sheet_to_json(hWs, { header: 1 })
-      const hHeaders: string[] = (hRaw[0] || []).map((h: any) => String(h || ''))
+      if (calcQuality && qualityFile) {
+        addLog('读取质差指标文件...')
+        setProgress(10)
+        await yieldToMain()
+        const qBuf = await qualityFile.arrayBuffer()
+        const qWb = XLSX.read(qBuf, { type: 'array' })
+        const qWs = qWb.Sheets[qWb.SheetNames[0]]
+        qRaw = XLSX.utils.sheet_to_json(qWs, { header: 1 })
+        qHeaders = (qRaw[0] || []).map((h: any) => String(h || ''))
+      }
+
+      if (calcHighload && highloadFile) {
+        addLog('读取高负荷指标文件...')
+        setProgress(20)
+        await yieldToMain()
+        const hBuf = await highloadFile.arrayBuffer()
+        const hWb = XLSX.read(hBuf, { type: 'array' })
+        const hWs = hWb.Sheets[hWb.SheetNames[0]]
+        hRaw = XLSX.utils.sheet_to_json(hWs, { header: 1 })
+        hHeaders = (hRaw[0] || []).map((h: any) => String(h || ''))
+      }
 
       // 识别列名（与Python完全一致）
       const colSubnet = findCol(qHeaders, ['子网名称']) || findCol(hHeaders, ['子网名称'])
@@ -219,15 +238,15 @@ export default function CellAnalysisPage() {
       const qNeededCols = [colSubnet, colMasterId, colVoiceAccess, colVoiceRelease, colVoiceSetupSucc, colVoiceDropRate, colVoiceHoSucc, colVoicePdcpUpLoss, colVoicePdcpDnLoss, col5gAccessCnt, col5gReleaseCnt, col5gDnRlcTraffic, col5gBand, col5gAvgSpeed, col5gAccessSucc, col5gUeDropRate].filter((c): c is string => c !== null)
       const hNeededCols = [hColSubnet, hColMasterId, colPrbUtil, colDnTraffic, colRrcUsers, colBand].filter((c): c is string => c !== null)
 
-      const dfQuality = buildRows(qRaw, qHeaders, qNeededCols)
+      const dfQuality = calcQuality ? buildRows(qRaw, qHeaders, qNeededCols) : []
       await yieldToMain()
-      addLog(`质差文件：${dfQuality.length}行，${qNeededCols.length}列`)
+      if (calcQuality) addLog(`质差文件：${dfQuality.length}行，${qNeededCols.length}列`)
       setProgress(40)
       await yieldToMain()
 
-      const dfHighload = buildRows(hRaw, hHeaders, hNeededCols)
+      const dfHighload = calcHighload ? buildRows(hRaw, hHeaders, hNeededCols) : []
       await yieldToMain()
-      addLog(`高负荷文件：${dfHighload.length}行，${hNeededCols.length}列`)
+      if (calcHighload) addLog(`高负荷文件：${dfHighload.length}行，${hNeededCols.length}列`)
       setProgress(50)
 
       // 小区基础信息
@@ -274,14 +293,15 @@ export default function CellAnalysisPage() {
       const getCity = (r: any, col: string | null) => col ? String(r[col] || '未知').substring(0, 2).trim() || '未知' : '未知'
 
       // ============ 一、语音质差 ============
-      addLog('开始语音质差分析...')
-      setProgress(60)
-      await yieldToMain()
-      const hasVoiceCols = colVoiceSetupSucc && colVoiceDropRate && colVoiceHoSucc && colVoicePdcpUpLoss && colVoicePdcpDnLoss
-
       let voiceBadRows: any[] = []
       let voiceStats = { total: 0, lowSetup: 0, highDrop: 0, lowHo: 0, highLoss: 0, bad: 0 }
       const voiceCityMap = new Map<string, { total: number, lowSetup: number, highDrop: number, lowHo: number, highLoss: number, bad: number }>()
+
+      if (calcQuality) {
+        addLog('开始语音质差分析...')
+        setProgress(60)
+        await yieldToMain()
+        const hasVoiceCols = colVoiceSetupSucc && colVoiceDropRate && colVoiceHoSucc && colVoicePdcpUpLoss && colVoicePdcpDnLoss
 
       if (hasVoiceCols) {
         for (let i = 0; i < dfQuality.length; i++) {
@@ -325,14 +345,17 @@ export default function CellAnalysisPage() {
         }
       }
       addLog(`语音质差分析完成：有效${voiceStats.total}个，质差${voiceStats.bad}个`)
+      } // end calcQuality
 
       // ============ 二、5G通用质差 ============
-      addLog('开始5G通用质差分析...')
-      setProgress(70)
-      await yieldToMain()
       let g5BadRows: any[] = []
       let g5Stats = { total: 0, lowSpeed: 0, lowAccess: 0, highDrop: 0, bad: 0 }
       const g5CityMap = new Map<string, { total: number, lowSpeed: number, lowAccess: number, highDrop: number, bad: number }>()
+
+      if (calcQuality) {
+        addLog('开始5G通用质差分析...')
+        setProgress(70)
+        await yieldToMain()
 
       for (let i = 0; i < dfQuality.length; i++) {
         if (cancelRef.current) { addLog('分析已取消'); setProcessing(false); return }
@@ -376,16 +399,20 @@ export default function CellAnalysisPage() {
         if (i > 0 && i % 5000 === 0) await yieldToMain()
       }
       addLog(`5G质差分析完成：有效${g5Stats.total}个，质差${g5Stats.bad}个`)
+      } // end calcQuality
 
       // ============ 三、高负荷 ============
-      addLog('开始高负荷小区分析...')
-      setProgress(80)
-      await yieldToMain()
       const highLoadTypeMap = new Map<string, number>()
-      let highLoadStats = { total: dfHighload.length, bad: 0 }
       let highLoadBadRows: any[] = []
       const hlCityMap = new Map<string, { total: number, bad: number }>()
       const hlSubnet = hColSubnet || colSubnet
+      let highLoadStats = { total: 0, bad: 0 }
+
+      if (calcHighload) {
+        addLog('开始高负荷小区分析...')
+        setProgress(80)
+        await yieldToMain()
+        highLoadStats.total = dfHighload.length
 
       for (let i = 0; i < dfHighload.length; i++) {
         if (cancelRef.current) { addLog('分析已取消'); setProcessing(false); return }
@@ -432,6 +459,7 @@ export default function CellAnalysisPage() {
         if (i > 0 && i % 5000 === 0) await yieldToMain()
       }
       addLog(`高负荷分析完成：监测${highLoadStats.total}个，高负荷${highLoadStats.bad}个`)
+      } // end calcHighload
 
       // ============ 四、地市汇总 ============
       setProgress(90)
@@ -508,7 +536,7 @@ export default function CellAnalysisPage() {
     } finally {
       setProcessing(false)
     }
-  }, [qualityFile, highloadFile, cellInfoFile, voiceTh, g5Th, highLoadTh, addLog])
+  }, [qualityFile, highloadFile, cellInfoFile, calcQuality, calcHighload, voiceTh, g5Th, highLoadTh, addLog])
 
   const handleDownload = useCallback(() => {
     if (!resultBlob) return
@@ -552,11 +580,29 @@ export default function CellAnalysisPage() {
 
         <div className="p-6 sm:p-8">
           <div className="max-w-3xl mx-auto space-y-6">
+            {/* 计算项选择 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${calcQuality ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--muted))]'}`}>
+                <input type="checkbox" checked={calcQuality} onChange={e => setCalcQuality(e.target.checked)} className="w-4 h-4 accent-[hsl(var(--primary))]" />
+                <div>
+                  <div className="text-sm font-medium text-[hsl(var(--foreground))]">质差指标计算</div>
+                  <div className="text-xs text-[hsl(var(--muted-foreground))]">语音质差 + 5G通用质差</div>
+                </div>
+              </label>
+              <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${calcHighload ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.03)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--muted))]'}`}>
+                <input type="checkbox" checked={calcHighload} onChange={e => setCalcHighload(e.target.checked)} className="w-4 h-4 accent-[hsl(var(--primary))]" />
+                <div>
+                  <div className="text-sm font-medium text-[hsl(var(--foreground))]">高负荷指标计算</div>
+                  <div className="text-xs text-[hsl(var(--muted-foreground))]">PRB占用率 + 流量/用户数门限</div>
+                </div>
+              </label>
+            </div>
+
             {/* 文件上传 */}
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-[hsl(var(--foreground))]">质差类指标文件 <span className="text-red-500">*</span></div>
+                  <div className="text-sm font-medium text-[hsl(var(--foreground))]">质差类指标文件 {calcQuality && <span className="text-red-500">{'*'}</span>}</div>
                   <UploadPanel onUpload={setQualityFile} accept=".xlsx,.xls" title="点击或拖拽上传质差类指标文件" subtitle="支持 .xlsx / .xls 格式" />
                   {qualityFile && (
                     <div className="flex items-center gap-2 text-xs text-[hsl(var(--foreground))]">
@@ -567,7 +613,7 @@ export default function CellAnalysisPage() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-[hsl(var(--foreground))]">高负荷指标文件 <span className="text-red-500">*</span></div>
+                  <div className="text-sm font-medium text-[hsl(var(--foreground))]">高负荷指标文件 {calcHighload && <span className="text-red-500">{'*'}</span>}</div>
                   <UploadPanel onUpload={setHighloadFile} accept=".xlsx,.xls" title="点击或拖拽上传高负荷指标文件" subtitle="支持 .xlsx / .xls 格式" />
                   {highloadFile && (
                     <div className="flex items-center gap-2 text-xs text-[hsl(var(--foreground))]">
@@ -693,7 +739,7 @@ export default function CellAnalysisPage() {
 
             {/* 运行按钮 */}
             <div className="flex gap-3">
-              <button onClick={handleRun} disabled={processing || !qualityFile || !highloadFile}
+              <button onClick={handleRun} disabled={processing || (calcQuality && !qualityFile) || (calcHighload && !highloadFile) || (!calcQuality && !calcHighload)}
                 className="flex-1 py-3 rounded-xl bg-[hsl(var(--primary))] text-white font-medium text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {processing ? <><Loader2 className="w-4 h-4 animate-spin" />分析中...</> : <><AlertTriangle className="w-4 h-4" />开始分析</>}
               </button>
