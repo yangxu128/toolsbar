@@ -93,11 +93,11 @@ interface RootCauseCols {
   srsRlf: string | null
 }
 
-function analyzeRootCause(r: any, cols: RootCauseCols, type: 'access' | 'drop'): string {
+function analyzeRootCause(r: any, cols: RootCauseCols, types: ('access' | 'drop')[]): string {
   const causes: string[] = []
   const N = (v: any) => { const n = toNum(v); return isNaN(n) ? 0 : n }
 
-  if (type === 'access') {
+  if (types.includes('access')) {
     const qosFails: { key: string; val: number; cause: string }[] = []
     for (const [k, col] of Object.entries(cols.qosFail)) {
       if (col) {
@@ -106,21 +106,29 @@ function analyzeRootCause(r: any, cols: RootCauseCols, type: 'access' | 'drop'):
       }
     }
     qosFails.sort((a, b) => b.val - a.val)
-    if (qosFails.length > 0 && qosFails[0].val > 0) {
-      causes.push(`QoS Flow建立失败Top原因：${qosFails[0].cause}（${qosFails[0].val}次）`)
+    if (qosFails.length > 0) {
+      const top3 = qosFails.slice(0, 3)
+      causes.push('【接入失败】QoS Flow建立失败Top原因：' + top3.map((f, i) => `${i + 1}.${f.cause}(${f.val}次)`).join('；'))
     }
 
-    if (cols.rrcFail.timer && N(r[cols.rrcFail.timer]) > 0) causes.push('RRC建立失败-定时器超时：核查T300/AliceBar参数及无线环境')
-    if (cols.rrcFail.admit && N(r[cols.rrcFail.admit]) > 0) causes.push('RRC建立失败-接纳失败：核查接纳控制门限参数')
-    if (cols.rrcFail.other && N(r[cols.rrcFail.other]) > 0) causes.push('RRC建立失败-其它原因：无线环境排查')
+    const rrcFails: { val: number; cause: string }[] = []
+    if (cols.rrcFail.timer && N(r[cols.rrcFail.timer]) > 0) rrcFails.push({ val: N(r[cols.rrcFail.timer]), cause: '定时器超时：核查T300定时器及无线环境' })
+    if (cols.rrcFail.admit && N(r[cols.rrcFail.admit]) > 0) rrcFails.push({ val: N(r[cols.rrcFail.admit]), cause: '接纳失败：核查载波用户数接纳控制门限ueNumACThrd' })
+    if (cols.rrcFail.other && N(r[cols.rrcFail.other]) > 0) rrcFails.push({ val: N(r[cols.rrcFail.other]), cause: '其它原因：无线环境排查' })
+    if (rrcFails.length > 0) {
+      rrcFails.sort((a, b) => b.val - a.val)
+      causes.push('【RRC建立失败】' + rrcFails.map(f => `${f.cause}(${f.val}次)`).join('；'))
+    }
 
     if (cols.ngSetupSucc) {
       const ngSucc = toNum(r[cols.ngSetupSucc])
-      if (!isNaN(ngSucc) && ngSucc < 95) causes.push('NG接口信令连接建立成功率低：核查NG链路闪断及核心网信令防冲击')
+      if (!isNaN(ngSucc) && ngSucc < 95) {
+        causes.push(`【NG接口】信令连接建立成功率${ngSucc.toFixed(1)}%<95%：1.核查NG链路闪断(C600240002)；2.核查核心网信令防冲击策略`)
+      }
     }
   }
 
-  if (type === 'drop') {
+  if (types.includes('drop')) {
     const ctxFails: { key: string; val: number; cause: string }[] = []
     for (const [k, col] of Object.entries(cols.ctxRelease)) {
       if (col) {
@@ -129,48 +137,68 @@ function analyzeRootCause(r: any, cols: RootCauseCols, type: 'access' | 'drop'):
       }
     }
     ctxFails.sort((a, b) => b.val - a.val)
-    if (ctxFails.length > 0 && ctxFails[0].val > 0) {
+    if (ctxFails.length > 0) {
       const top = ctxFails[0]
-      let cause = `掉线Top原因：${top.cause}（${top.val}次）`
-      if (top.key === 'rlf' && cols.srsRlf) {
-        const srsRatio = N(r[cols.srsRlf]) / (top.val || 1) * 100
-        if (srsRatio > 30) cause += `；SRS拔卡占比${srsRatio.toFixed(0)}%>30%，疑似终端异常`
+      let causeStr = `【掉线Top原因】${top.cause}(${top.val}次)`
+      if (top.key === 'rlf') {
+        causeStr += '→1.排查SRS拔卡'
+        if (cols.srsRlf) {
+          const srsRatio = N(r[cols.srsRlf]) / (top.val || 1) * 100
+          if (srsRatio > 30) causeStr += `(C610060010占比${srsRatio.toFixed(0)}%>30%，疑似终端SRS发送异常)`
+          else causeStr += `(C610060010占比${srsRatio.toFixed(0)}%<30%，排除SRS拔卡)`
+        }
+        causeStr += '；2.核查RLF定时器(n310<20/t310<1000异常)；3.无线环境排查'
+      } else if (top.key === 'hoFail') {
+        causeStr += '→参考系统内移动性指标优化：核查邻区配置、XN链路、PCI冲突/混淆'
+      } else if (top.key === 'reestablishFail') {
+        causeStr += '→分析重建立子计数器'
+      } else if (top.key === 'other') {
+        causeStr += '→1.核查切片选择失败(C600080126)；2.无线环境排查'
+      } else if (top.key === 'airFail' || top.key === 'normal') {
+        causeStr += '→1.无线环境排查；2.参数核查(参考控制面指标提升参数表)'
       }
-      causes.push(cause)
+      causes.push(causeStr)
     }
 
-    if (cols.reestablishFail.other && N(r[cols.reestablishFail.other]) > 0) causes.push('重建立失败-其他原因：无线环境排查')
-    if (cols.reestablishFail.timeout && N(r[cols.reestablishFail.timeout]) > 0) causes.push('重建立失败-定时器超时：无线环境排查')
-    if (cols.reestablishFail.admit && N(r[cols.reestablishFail.admit]) > 0) causes.push('重建立失败-接纳失败：参考接纳失败分析')
+    const reestFails: { val: number; cause: string }[] = []
+    if (cols.reestablishFail.other && N(r[cols.reestablishFail.other]) > 0) reestFails.push({ val: N(r[cols.reestablishFail.other]), cause: '其他原因：核查CA配置/邻区/无线环境' })
+    if (cols.reestablishFail.timeout && N(r[cols.reestablishFail.timeout]) > 0) reestFails.push({ val: N(r[cols.reestablishFail.timeout]), cause: '定时器超时：无线环境排查' })
+    if (cols.reestablishFail.admit && N(r[cols.reestablishFail.admit]) > 0) reestFails.push({ val: N(r[cols.reestablishFail.admit]), cause: 'gNB接纳失败：参考接纳失败分析' })
+    if (cols.reestablishFail.fallback && N(r[cols.reestablishFail.fallback]) > 0) reestFails.push({ val: N(r[cols.reestablishFail.fallback]), cause: '回落重建失败：无线环境排查' })
+    if (reestFails.length > 0) {
+      reestFails.sort((a, b) => b.val - a.val)
+      causes.push('【重建立失败】' + reestFails.map(f => `${f.cause}(${f.val}次)`).join('；'))
+    }
   }
 
   const coverageCauses: string[] = []
   if (cols.coverage.weakCover) {
     const v = toNum(r[cols.coverage.weakCover])
-    if (!isNaN(v) && v >= 20) coverageCauses.push(`下行弱覆盖（RSRP<=-108占比${v.toFixed(1)}%）`)
+    if (!isNaN(v) && v >= 20) coverageCauses.push(`下行弱覆盖(RSRP<=-108占比${v.toFixed(1)}%≥20%→弱覆盖优化)`)
   }
   if (cols.coverage.overCover) {
     const v = toNum(r[cols.coverage.overCover])
-    if (!isNaN(v) && v >= 30) coverageCauses.push(`下行过覆盖（TA>800m占比${v.toFixed(1)}%）`)
+    if (!isNaN(v) && v >= 30) coverageCauses.push(`下行过覆盖(TA>800m占比${v.toFixed(1)}%≥30%→过覆盖优化)`)
   }
   if (cols.coverage.overlapCover) {
     const v = toNum(r[cols.coverage.overlapCover])
-    if (!isNaN(v) && v >= 20) coverageCauses.push(`下行重叠覆盖（${v.toFixed(1)}%）`)
+    if (!isNaN(v) && v >= 20) coverageCauses.push(`下行重叠覆盖(${v.toFixed(1)}%≥20%→重叠覆盖优化)`)
   }
   if (cols.coverage.weakUlCover) {
     const v = toNum(r[cols.coverage.weakUlCover])
-    if (!isNaN(v) && v >= 20) coverageCauses.push(`上行弱覆盖（路损>135占比${v.toFixed(1)}%）`)
+    const th = types.includes('drop') ? 20 : 30
+    if (!isNaN(v) && v >= th) coverageCauses.push(`上行弱覆盖(路损>135占比${v.toFixed(1)}%≥${th}%→上行弱覆盖优化)`)
   }
   if (cols.coverage.puschIntf || cols.coverage.pucchIntf) {
     const pusch = cols.coverage.puschIntf ? toNum(r[cols.coverage.puschIntf]) : NaN
     const pucch = cols.coverage.pucchIntf ? toNum(r[cols.coverage.pucchIntf]) : NaN
     if ((!isNaN(pusch) && pusch > -95) || (!isNaN(pucch) && pucch > -95)) {
-      coverageCauses.push(`上行干扰（PUSCH:${isNaN(pusch) ? 'N/A' : pusch.toFixed(1)}dBm, PUCCH:${isNaN(pucch) ? 'N/A' : pucch.toFixed(1)}dBm）`)
+      coverageCauses.push(`上行干扰(PUSCH:${isNaN(pusch) ? 'N/A' : pusch.toFixed(1)}dBm, PUCCH:${isNaN(pucch) ? 'N/A' : pucch.toFixed(1)}dBm>-95→干扰排查优化)`)
     }
   }
-  if (coverageCauses.length > 0) causes.push('覆盖/干扰问题：' + coverageCauses.join('，'))
+  if (coverageCauses.length > 0) causes.push('【覆盖/干扰】' + coverageCauses.join('；'))
 
-  return causes.length > 0 ? causes.join('；') : '未识别到明显根因，建议上报故障分析'
+  return causes.length > 0 ? causes.join(' | ') : '未识别到明显根因，建议上报故障分析'
 }
 
 function getQoSFailCause(key: string): string {
@@ -521,7 +549,11 @@ export default function CellAnalysisPage() {
             voiceStats.bad++
             const out: any = { ...r }
             out['语音-低接通'] = lowSetup; out['语音-高掉线'] = highDrop; out['语音-低切换'] = lowHo; out['语音-高丢包'] = highLoss; out['语音-质差小区'] = isBad
-            out['根因分析'] = analyzeRootCause(r, rootCauseCols, highDrop ? 'drop' : 'access')
+            const badTypes: ('access' | 'drop')[] = []
+            if (lowSetup) badTypes.push('access')
+            if (highDrop) badTypes.push('drop')
+            if (badTypes.length === 0) badTypes.push('access')
+            out['根因分析'] = analyzeRootCause(r, rootCauseCols, badTypes)
             voiceBadRows.push(out)
           }
 
@@ -577,7 +609,11 @@ export default function CellAnalysisPage() {
           g5Stats.bad++
           const out: any = { ...r }
           out['速率门限(Mbps)'] = threshold; out['5G-低速率'] = lowSpeed; out['5G-低接入'] = lowAccess; out['5G-高掉线'] = highDrop; out['5G-质差小区'] = isBad
-          out['根因分析'] = analyzeRootCause(r, rootCauseCols, highDrop ? 'drop' : 'access')
+          const badTypes: ('access' | 'drop')[] = []
+          if (lowAccess) badTypes.push('access')
+          if (highDrop) badTypes.push('drop')
+          if (badTypes.length === 0) badTypes.push('access')
+          out['根因分析'] = analyzeRootCause(r, rootCauseCols, badTypes)
           g5BadRows.push(out)
         }
 
