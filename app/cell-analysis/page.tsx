@@ -80,161 +80,10 @@ function yieldToMain() {
   return new Promise(r => setTimeout(r, 0))
 }
 
-interface RootCauseCols {
-  qosFail: Record<string, string | null>
-  ctxRelease: Record<string, string | null>
-  reestablishFail: Record<string, string | null>
-  rrcFail: Record<string, string | null>
-  coverage: Record<string, string | null>
-  rrcSetupSucc: string | null
-  ngSetupSucc: string | null
-  qosSetupSucc: string | null
-  dropRate: string | null
-  srsRlf: string | null
-}
-
-function analyzeRootCause(r: any, cols: RootCauseCols, types: ('access' | 'drop')[]): string {
-  const causes: string[] = []
-  const N = (v: any) => { const n = toNum(v); return isNaN(n) ? 0 : n }
-
-  if (types.includes('access')) {
-    const qosFails: { key: string; val: number; cause: string }[] = []
-    for (const [k, col] of Object.entries(cols.qosFail)) {
-      if (col) {
-        const v = N(r[col])
-        if (v > 0) qosFails.push({ key: k, val: v, cause: getQoSFailCause(k) })
-      }
-    }
-    qosFails.sort((a, b) => b.val - a.val)
-    if (qosFails.length > 0) {
-      const top3 = qosFails.slice(0, 3)
-      causes.push('【接入失败】QoS Flow建立失败Top原因：' + top3.map((f, i) => `${i + 1}.${f.cause}(${f.val}次)`).join('；'))
-    }
-
-    const rrcFails: { val: number; cause: string }[] = []
-    if (cols.rrcFail.timer && N(r[cols.rrcFail.timer]) > 0) rrcFails.push({ val: N(r[cols.rrcFail.timer]), cause: '定时器超时：核查T300定时器及无线环境' })
-    if (cols.rrcFail.admit && N(r[cols.rrcFail.admit]) > 0) rrcFails.push({ val: N(r[cols.rrcFail.admit]), cause: '接纳失败：核查载波用户数接纳控制门限ueNumACThrd' })
-    if (cols.rrcFail.other && N(r[cols.rrcFail.other]) > 0) rrcFails.push({ val: N(r[cols.rrcFail.other]), cause: '其它原因：无线环境排查' })
-    if (rrcFails.length > 0) {
-      rrcFails.sort((a, b) => b.val - a.val)
-      causes.push('【RRC建立失败】' + rrcFails.map(f => `${f.cause}(${f.val}次)`).join('；'))
-    }
-
-    if (cols.ngSetupSucc) {
-      const ngSucc = toNum(r[cols.ngSetupSucc])
-      if (!isNaN(ngSucc) && ngSucc < 95) {
-        causes.push(`【NG接口】信令连接建立成功率${ngSucc.toFixed(1)}%<95%：1.核查NG链路闪断(C600240002)；2.核查核心网信令防冲击策略`)
-      }
-    }
-  }
-
-  if (types.includes('drop')) {
-    const ctxFails: { key: string; val: number; cause: string }[] = []
-    for (const [k, col] of Object.entries(cols.ctxRelease)) {
-      if (col) {
-        const v = N(r[col])
-        if (v > 0) ctxFails.push({ key: k, val: v, cause: getCtxReleaseCause(k) })
-      }
-    }
-    ctxFails.sort((a, b) => b.val - a.val)
-    if (ctxFails.length > 0) {
-      const top = ctxFails[0]
-      let causeStr = `【掉线Top原因】${top.cause}(${top.val}次)`
-      if (top.key === 'rlf') {
-        causeStr += '→1.排查SRS拔卡'
-        if (cols.srsRlf) {
-          const srsRatio = N(r[cols.srsRlf]) / (top.val || 1) * 100
-          if (srsRatio > 30) causeStr += `(C610060010占比${srsRatio.toFixed(0)}%>30%，疑似终端SRS发送异常)`
-          else causeStr += `(C610060010占比${srsRatio.toFixed(0)}%<30%，排除SRS拔卡)`
-        }
-        causeStr += '；2.核查RLF定时器(n310<20/t310<1000异常)；3.无线环境排查'
-      } else if (top.key === 'hoFail') {
-        causeStr += '→参考系统内移动性指标优化：核查邻区配置、XN链路、PCI冲突/混淆'
-      } else if (top.key === 'reestablishFail') {
-        causeStr += '→分析重建立子计数器'
-      } else if (top.key === 'other') {
-        causeStr += '→1.核查切片选择失败(C600080126)；2.无线环境排查'
-      } else if (top.key === 'airFail' || top.key === 'normal') {
-        causeStr += '→1.无线环境排查；2.参数核查(参考控制面指标提升参数表)'
-      }
-      causes.push(causeStr)
-    }
-
-    const reestFails: { val: number; cause: string }[] = []
-    if (cols.reestablishFail.other && N(r[cols.reestablishFail.other]) > 0) reestFails.push({ val: N(r[cols.reestablishFail.other]), cause: '其他原因：核查CA配置/邻区/无线环境' })
-    if (cols.reestablishFail.timeout && N(r[cols.reestablishFail.timeout]) > 0) reestFails.push({ val: N(r[cols.reestablishFail.timeout]), cause: '定时器超时：无线环境排查' })
-    if (cols.reestablishFail.admit && N(r[cols.reestablishFail.admit]) > 0) reestFails.push({ val: N(r[cols.reestablishFail.admit]), cause: 'gNB接纳失败：参考接纳失败分析' })
-    if (cols.reestablishFail.fallback && N(r[cols.reestablishFail.fallback]) > 0) reestFails.push({ val: N(r[cols.reestablishFail.fallback]), cause: '回落重建失败：无线环境排查' })
-    if (reestFails.length > 0) {
-      reestFails.sort((a, b) => b.val - a.val)
-      causes.push('【重建立失败】' + reestFails.map(f => `${f.cause}(${f.val}次)`).join('；'))
-    }
-  }
-
-  const coverageCauses: string[] = []
-  if (cols.coverage.weakCover) {
-    const v = toNum(r[cols.coverage.weakCover])
-    if (!isNaN(v) && v >= 20) coverageCauses.push(`下行弱覆盖(RSRP<=-108占比${v.toFixed(1)}%≥20%→弱覆盖优化)`)
-  }
-  if (cols.coverage.overCover) {
-    const v = toNum(r[cols.coverage.overCover])
-    if (!isNaN(v) && v >= 30) coverageCauses.push(`下行过覆盖(TA>800m占比${v.toFixed(1)}%≥30%→过覆盖优化)`)
-  }
-  if (cols.coverage.overlapCover) {
-    const v = toNum(r[cols.coverage.overlapCover])
-    if (!isNaN(v) && v >= 20) coverageCauses.push(`下行重叠覆盖(${v.toFixed(1)}%≥20%→重叠覆盖优化)`)
-  }
-  if (cols.coverage.weakUlCover) {
-    const v = toNum(r[cols.coverage.weakUlCover])
-    const th = types.includes('drop') ? 20 : 30
-    if (!isNaN(v) && v >= th) coverageCauses.push(`上行弱覆盖(路损>135占比${v.toFixed(1)}%≥${th}%→上行弱覆盖优化)`)
-  }
-  if (cols.coverage.puschIntf || cols.coverage.pucchIntf) {
-    const pusch = cols.coverage.puschIntf ? toNum(r[cols.coverage.puschIntf]) : NaN
-    const pucch = cols.coverage.pucchIntf ? toNum(r[cols.coverage.pucchIntf]) : NaN
-    if ((!isNaN(pusch) && pusch > -95) || (!isNaN(pucch) && pucch > -95)) {
-      coverageCauses.push(`上行干扰(PUSCH:${isNaN(pusch) ? 'N/A' : pusch.toFixed(1)}dBm, PUCCH:${isNaN(pucch) ? 'N/A' : pucch.toFixed(1)}dBm>-95→干扰排查优化)`)
-    }
-  }
-  if (coverageCauses.length > 0) causes.push('【覆盖/干扰】' + coverageCauses.join('；'))
-
-  return causes.length > 0 ? causes.join(' | ') : '未识别到明显根因，建议上报故障分析'
-}
-
-function getQoSFailCause(key: string): string {
-  const map: Record<string, string> = {
-    msgErrEpsfb: '消息参数错误(EPS fallback)，核查EPSFallbackCtrl-epsfbSwitch参数',
-    msgErrVor: '消息参数错误(VoNR/ViNR)，核查MobilityCtrl-voNrSwitch参数',
-    sliceFailEpsfb: '切片选择失败(EPS fallback)，核查切片配置',
-    sliceFailVor: '切片选择失败(VoNR/ViNR)，核查切片配置',
-    flowConflictEpsfb: '流程冲突(EPS fallback)，核查voiceHandoverPriorityStgy参数',
-    flowConflictVor: '流程冲突(VoNR/ViNR)，核查voiceHandoverPriorityStgy参数',
-    waitReconfig: '等待重配完成超时，无线环境排查',
-    transport: '传输层原因，联合核心网传输排查',
-    bearerAdmit: '承载接纳失败，核查接纳参数',
-    sliceResource: '切片资源受限，上报故障',
-    otherInit: '其它原因(初始)，无线环境排查',
-    otherVor: '其它原因(VoNR/ViNR)，无线环境排查',
-    otherEpsfb: '其它原因(EPS fallback)，无线环境排查',
-    msgErrInit: '消息参数错误(初始)，核查参数配置',
-  }
-  return map[key] || key
-}
-
-function getCtxReleaseCause(key: string): string {
-  const map: Record<string, string> = {
-    rlf: 'RLF引发释放，排查终端SRS/RLF定时器/无线环境',
-    hoFail: '切换失败引发释放，参考移动性指标分析',
-    airFail: '空口失败引发释放，无线环境排查',
-    other: '其它原因引发释放，排查切片配置及无线环境',
-    reestablishFail: '重建立失败引发释放，分析重建立子计数器',
-    normal: '正常释放，无线环境排查',
-  }
-  return map[key] || key
-}
-
-function buildRows(rawRows: any[][], headers: string[], neededCols: string[]): any[] {
-  const colIndices = neededCols.map(name => headers.indexOf(name)).filter(i => i >= 0)
+function buildRows(rawRows: any[][], headers: string[], neededCols?: string[]): any[] {
+  const colIndices = neededCols && neededCols.length > 0
+    ? neededCols.map(name => headers.indexOf(name)).filter(i => i >= 0)
+    : headers.map((_, i) => i)
   const result: any[] = []
   for (let i = 1; i < rawRows.length; i++) {
     const row = rawRows[i]
@@ -366,61 +215,6 @@ export default function CellAnalysisPage() {
       const col5gAccessSucc = findCol(qHeaders, ['无线接入成功率(%)', '无线接入成功率'])
       const col5gUeDropRate = findCol(qHeaders, ['UE上下文掉线率(%)', 'UE上下文掉线率'])
 
-      const colRrcSetupSucc = findCol(qHeaders, ['667000:RRC连接建立成功率', 'RRC连接建立成功率'])
-      const colNgSetupSucc = findCol(qHeaders, ['667183:NG接口UE相关逻辑信令连接建立成功率', 'NG接口UE相关逻辑信令连接建立成功率'])
-      const colQosSetupSucc = findCol(qHeaders, ['667014:QoS Flow建立成功率', 'QoS Flow建立成功率'])
-
-      const rootCauseCols: RootCauseCols = {
-        qosFail: {
-          msgErrEpsfb: findCol(qHeaders, ['C600080121']),
-          msgErrVor: findCol(qHeaders, ['C600080120']),
-          msgErrInit: findCol(qHeaders, ['C600080109']),
-          sliceFailEpsfb: findCol(qHeaders, ['C600080119']),
-          sliceFailVor: findCol(qHeaders, ['C600080118']),
-          flowConflictEpsfb: findCol(qHeaders, ['C600080111']),
-          flowConflictVor: findCol(qHeaders, ['C600080115']),
-          waitReconfig: findCol(qHeaders, ['C600080108']),
-          transport: findCol(qHeaders, ['C600080106']),
-          bearerAdmit: findCol(qHeaders, ['C600080105']),
-          sliceResource: findCol(qHeaders, ['C600080114']),
-          otherInit: findCol(qHeaders, ['C600080107']),
-          otherVor: findCol(qHeaders, ['C600080122']),
-          otherEpsfb: findCol(qHeaders, ['C600080123']),
-        },
-        ctxRelease: {
-          rlf: findCol(qHeaders, ['C600050029']),
-          hoFail: findCol(qHeaders, ['C600050010']),
-          airFail: findCol(qHeaders, ['C600050011']),
-          other: findCol(qHeaders, ['C600050014']),
-          reestablishFail: findCol(qHeaders, ['C600050036']),
-          normal: findCol(qHeaders, ['C600050037']),
-        },
-        reestablishFail: {
-          other: findCol(qHeaders, ['C616860021']),
-          fallback: findCol(qHeaders, ['C616860020']),
-          timeout: findCol(qHeaders, ['C616860018']),
-          admit: findCol(qHeaders, ['C616860019']),
-        },
-        rrcFail: {
-          timer: findCol(qHeaders, ['RRC连接建立失败次数-定时器超时']),
-          admit: findCol(qHeaders, ['RRC连接建立失败次数-接纳失败']),
-          other: findCol(qHeaders, ['RRC连接建立失败次数-其它原因']),
-        },
-        coverage: {
-          weakCover: findCol(qHeaders, ['服务小区SSB测量RSRP<=-108dBm占比', 'RSRP<=-108']),
-          overCover: findCol(qHeaders, ['TA大于800米占比', 'TA大于800']),
-          overlapCover: findCol(qHeaders, ['重叠覆盖率']),
-          weakUlCover: findCol(qHeaders, ['路损大于135的占比', '路损大于135']),
-          puschIntf: findCol(qHeaders, ['C616650045']),
-          pucchIntf: findCol(qHeaders, ['C616650047']),
-        },
-        rrcSetupSucc: colRrcSetupSucc,
-        ngSetupSucc: colNgSetupSucc,
-        qosSetupSucc: colQosSetupSucc,
-        dropRate: col5gUeDropRate,
-        srsRlf: findCol(qHeaders, ['C610060010']),
-      }
-
       const hColSubnet = findCol(hHeaders, ['子网名称'])
       const hColMasterId = findCol(hHeaders, ['masterOperatorId'])
       const colPrbUtil = findCol(hHeaders, ['下行PRB平均占用率'])
@@ -443,26 +237,15 @@ export default function CellAnalysisPage() {
       addLog(`PRB占用率: ${colPrbUtil || '未找到'}`)
 
       // 只提取需要的列，减少内存
-      const rootCauseAllCols = [
-        ...Object.values(rootCauseCols.qosFail),
-        ...Object.values(rootCauseCols.ctxRelease),
-        ...Object.values(rootCauseCols.reestablishFail),
-        ...Object.values(rootCauseCols.rrcFail),
-        ...Object.values(rootCauseCols.coverage),
-        rootCauseCols.rrcSetupSucc, rootCauseCols.ngSetupSucc, rootCauseCols.qosSetupSucc, rootCauseCols.srsRlf,
-      ].filter((c): c is string => c !== null)
-      const qNeededCols = [colSubnet, colMasterId, colVoiceAccess, colVoiceRelease, colVoiceSetupSucc, colVoiceDropRate, colVoiceHoSucc, colVoicePdcpUpLoss, colVoicePdcpDnLoss, col5gAccessCnt, col5gReleaseCnt, col5gDnRlcTraffic, col5gBand, col5gAvgSpeed, col5gAccessSucc, col5gUeDropRate, ...rootCauseAllCols].filter((c): c is string => c !== null)
-      const hNeededCols = [hColSubnet, hColMasterId, colPrbUtil, colDnTraffic, colRrcUsers, colBand].filter((c): c is string => c !== null)
-
-      const dfQuality = calcQuality ? buildRows(qRaw, qHeaders, qNeededCols) : []
+      const dfQuality = calcQuality ? buildRows(qRaw, qHeaders) : []
       await yieldToMain()
-      if (calcQuality) addLog(`质差文件：${dfQuality.length}行，${qNeededCols.length}列`)
+      if (calcQuality) addLog(`质差文件：${dfQuality.length}行，${qHeaders.length}列`)
       setProgress(40)
       await yieldToMain()
 
-      const dfHighload = calcHighload ? buildRows(hRaw, hHeaders, hNeededCols) : []
+      const dfHighload = calcHighload ? buildRows(hRaw, hHeaders) : []
       await yieldToMain()
-      if (calcHighload) addLog(`高负荷文件：${dfHighload.length}行，${hNeededCols.length}列`)
+      if (calcHighload) addLog(`高负荷文件：${dfHighload.length}行，${hHeaders.length}列`)
       setProgress(50)
 
       // 小区基础信息
@@ -549,11 +332,6 @@ export default function CellAnalysisPage() {
             voiceStats.bad++
             const out: any = { ...r }
             out['语音-低接通'] = lowSetup; out['语音-高掉线'] = highDrop; out['语音-低切换'] = lowHo; out['语音-高丢包'] = highLoss; out['语音-质差小区'] = isBad
-            const badTypes: ('access' | 'drop')[] = []
-            if (lowSetup) badTypes.push('access')
-            if (highDrop) badTypes.push('drop')
-            if (badTypes.length === 0) badTypes.push('access')
-            out['根因分析'] = analyzeRootCause(r, rootCauseCols, badTypes)
             voiceBadRows.push(out)
           }
 
@@ -609,11 +387,6 @@ export default function CellAnalysisPage() {
           g5Stats.bad++
           const out: any = { ...r }
           out['速率门限(Mbps)'] = threshold; out['5G-低速率'] = lowSpeed; out['5G-低接入'] = lowAccess; out['5G-高掉线'] = highDrop; out['5G-质差小区'] = isBad
-          const badTypes: ('access' | 'drop')[] = []
-          if (lowAccess) badTypes.push('access')
-          if (highDrop) badTypes.push('drop')
-          if (badTypes.length === 0) badTypes.push('access')
-          out['根因分析'] = analyzeRootCause(r, rootCauseCols, badTypes)
           g5BadRows.push(out)
         }
 
