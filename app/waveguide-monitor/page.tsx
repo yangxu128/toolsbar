@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { Home, Star, ChevronRight as ChevronRightIcon, Download, X, Loader2, Info, Thermometer, Wind, Droplets, Gauge } from 'lucide-react'
+import { Home, Star, ChevronRight as ChevronRightIcon, ChevronDown, Download, X, Loader2, Info, Thermometer, Wind, Droplets, Gauge } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 import UploadPanel from '@/components/upload-panel'
 
@@ -27,6 +27,8 @@ export default function WaveguideMonitorPage() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [dateRange, setDateRange] = useState<{ start: string; end: string } | null>(null)
+  const [activeCity, setActiveCity] = useState('')
+  const [showWeather, setShowWeather] = useState(false)
 
   const parseCity = (group: string): string => {
     const m = group.match(/网络优化-永久-(\S+)5G/)
@@ -86,6 +88,8 @@ export default function WaveguideMonitorPage() {
       setRows(merged)
       setDateRange({ start: formatDate(merged[0].time), end: formatDate(merged[merged.length - 1].time) })
       generateDefaultWeather(merged)
+      const firstCity = CITIES.find(c => merged.some(r => r.city === c)) || ''
+      setActiveCity(firstCity)
     } catch (e: any) {
       setErrorMsg(e.message || '解析失败')
     } finally {
@@ -133,6 +137,12 @@ export default function WaveguideMonitorPage() {
     return result
   }, [rows])
 
+  const { globalMin, globalMax } = useMemo(() => {
+    const values = rows.filter(r => r.value !== null).map(r => r.value as number)
+    if (values.length === 0) return { globalMin: -105, globalMax: -105 }
+    return { globalMin: Math.min(...values), globalMax: Math.max(...values) }
+  }, [rows])
+
   const handleWeatherChange = (idx: number, key: string, value: string) => {
     setWeather(prev => {
       const next = [...prev]
@@ -173,7 +183,7 @@ export default function WaveguideMonitorPage() {
             const cellRef = XLSX.utils.encode_cell({ r, c })
             if (!ws[cellRef]) ws[cellRef] = {}
             ws[cellRef].s = {
-              fill: { fgColor: { rgb: heatColorHex(v) }, patternType: 'solid' },
+              fill: { fgColor: { rgb: heatColorHex(v, globalMin, globalMax) }, patternType: 'solid' },
               alignment: { horizontal: 'center', vertical: 'center' },
               numFmt: '0.00',
             }
@@ -196,7 +206,7 @@ export default function WaveguideMonitorPage() {
     a.download = `大气波导干扰监控_${dateRange?.start || ''}_${dateRange?.end || ''}.xlsx`
     a.click()
     URL.revokeObjectURL(url)
-  }, [rows, matrixByCity, weather, dateRange])
+  }, [rows, matrixByCity, weather, dateRange, globalMin, globalMax])
 
   const findWeather = (date: string, key: string): string => {
     const row = weather.find(w => w['日期'] === date)
@@ -208,6 +218,7 @@ export default function WaveguideMonitorPage() {
     setWeather([])
     setDateRange(null)
     setErrorMsg('')
+    setActiveCity('')
   }
 
   return (
@@ -265,7 +276,7 @@ export default function WaveguideMonitorPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-6 animate-scale-in">
+            <div className="space-y-4 animate-scale-in">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="text-sm text-[hsl(var(--muted-foreground))]">
                   数据时间：{dateRange?.start} 至 {dateRange?.end}，共 {rows.length} 条记录
@@ -280,106 +291,123 @@ export default function WaveguideMonitorPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                {CITIES.map(city => {
-                  const s = stats[city]
-                  return (
-                    <div key={city} className="p-4 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
-                      <div className="text-sm font-semibold text-[hsl(var(--foreground))] mb-2">{city}</div>
-                      {s ? (
-                        <div className="space-y-1 text-xs text-[hsl(var(--muted-foreground))]">
-                          <div>最小：{s.min.toFixed(2)} dBm</div>
-                          <div>最大：{s.max.toFixed(2)} dBm</div>
-                          <div>平均：{s.avg.toFixed(2)} dBm</div>
-                          <div>样本：{s.count}</div>
-                        </div>
-                      ) : (
-                        <div className="text-xs text-[hsl(var(--muted-foreground))]">无数据</div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <Thermometer className="w-4 h-4 text-[hsl(var(--primary))]" />
-                  <span className="text-sm font-semibold text-[hsl(var(--foreground))]">天气信息（可编辑）</span>
-                </div>
-                <div className="overflow-auto max-h-[300px]">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-[hsl(var(--card))]">
-                      <tr className="border-b border-[hsl(var(--border))]">
-                        <th className="text-left py-2 px-2 text-[hsl(var(--muted-foreground))] font-medium">日期</th>
-                        <th className="text-left py-2 px-2 text-[hsl(var(--muted-foreground))] font-medium"><Droplets className="w-3.5 h-3.5 inline mr-1" />最高温</th>
-                        <th className="text-left py-2 px-2 text-[hsl(var(--muted-foreground))] font-medium">最低温</th>
-                        <th className="text-left py-2 px-2 text-[hsl(var(--muted-foreground))] font-medium">天气</th>
-                        <th className="text-left py-2 px-2 text-[hsl(var(--muted-foreground))] font-medium"><Wind className="w-3.5 h-3.5 inline mr-1" />风力指数</th>
-                        <th className="text-left py-2 px-2 text-[hsl(var(--muted-foreground))] font-medium">空气质量指数</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {weather.map((w, idx) => (
-                        <tr key={idx} className="border-b border-[hsl(var(--border))] last:border-0">
-                          <td className="py-2 px-2 text-[hsl(var(--foreground))] whitespace-nowrap">{w['日期']}</td>
-                          {['最高温', '最低温', '天气', '风力指数', '空气质量指数'].map(key => (
-                            <td key={key} className="py-1 px-2">
-                              <input
-                                type="text"
-                                value={String(w[key] || '')}
-                                onChange={e => handleWeatherChange(idx, key, e.target.value)}
-                                className="w-full min-w-[80px] bg-transparent border-b border-[hsl(var(--border))] focus:border-[hsl(var(--primary))] outline-none text-[hsl(var(--foreground))] text-sm py-1"
-                              />
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                {CITIES.map(city => {
-                  const cityMap = matrixByCity.get(city)
-                  if (!cityMap || cityMap.size === 0) return null
-                  const dates = Array.from(cityMap.keys()).sort()
-                  return (
-                    <div key={city} className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm overflow-hidden">
-                      <div className="px-4 py-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
-                        <span className="font-semibold text-[hsl(var(--foreground))]">{city}</span>
-                        <span className="text-xs text-[hsl(var(--muted-foreground))] ml-2">小区特殊时隙最后一个GP符号平均干扰电平(dBm)</span>
-                      </div>
-                      <div className="overflow-auto">
-                        <table className="w-full text-xs">
-                          <thead className="sticky top-0 z-10">
-                            <tr className="bg-[hsl(var(--muted))]">
-                              <th className="py-2 px-2 text-left text-[hsl(var(--foreground))] font-medium sticky left-0 bg-[hsl(var(--muted))] z-20">时间</th>
-                              {dates.map(d => (
-                                <th key={d} className="py-2 px-1 text-center text-[hsl(var(--muted-foreground))] font-medium min-w-[64px]">{d.slice(5)}</th>
+              <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm overflow-hidden">
+                <button
+                  onClick={() => setShowWeather(!showWeather)}
+                  className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-[hsl(var(--muted))] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Thermometer className="w-4 h-4 text-[hsl(var(--primary))]" />
+                    <span className="text-sm font-semibold text-[hsl(var(--foreground))]">天气信息（可编辑）</span>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-[hsl(var(--muted-foreground))] transition-transform ${showWeather ? '' : '-rotate-90'}`} />
+                </button>
+                {showWeather && (
+                  <div className="p-5 border-t border-[hsl(var(--border))]">
+                    <div className="overflow-auto max-h-[240px]">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-[hsl(var(--card))]">
+                          <tr className="border-b border-[hsl(var(--border))]">
+                            <th className="text-left py-2 px-2 text-[hsl(var(--muted-foreground))] font-medium">日期</th>
+                            <th className="text-left py-2 px-2 text-[hsl(var(--muted-foreground))] font-medium"><Droplets className="w-3.5 h-3.5 inline mr-1" />最高温</th>
+                            <th className="text-left py-2 px-2 text-[hsl(var(--muted-foreground))] font-medium">最低温</th>
+                            <th className="text-left py-2 px-2 text-[hsl(var(--muted-foreground))] font-medium">天气</th>
+                            <th className="text-left py-2 px-2 text-[hsl(var(--muted-foreground))] font-medium"><Wind className="w-3.5 h-3.5 inline mr-1" />风力指数</th>
+                            <th className="text-left py-2 px-2 text-[hsl(var(--muted-foreground))] font-medium">空气质量指数</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {weather.map((w, idx) => (
+                            <tr key={idx} className="border-b border-[hsl(var(--border))] last:border-0">
+                              <td className="py-2 px-2 text-[hsl(var(--foreground))] whitespace-nowrap">{w['日期']}</td>
+                              {['最高温', '最低温', '天气', '风力指数', '空气质量指数'].map(key => (
+                                <td key={key} className="py-1 px-2">
+                                  <input
+                                    type="text"
+                                    value={String(w[key] || '')}
+                                    onChange={e => handleWeatherChange(idx, key, e.target.value)}
+                                    className="w-full min-w-[80px] bg-transparent border-b border-[hsl(var(--border))] focus:border-[hsl(var(--primary))] outline-none text-[hsl(var(--foreground))] text-sm py-1"
+                                  />
+                                </td>
                               ))}
                             </tr>
-                          </thead>
-                          <tbody>
-                            {HOURS.map(h => (
-                              <tr key={h} className="border-t border-[hsl(var(--border))]">
-                                <td className="py-1.5 px-2 text-[hsl(var(--foreground))] font-medium sticky left-0 bg-[hsl(var(--card))] z-10">{`${h}:00:00`}</td>
-                                {dates.map(d => {
-                                  const v = cityMap.get(d)![h]
-                                  return (
-                                    <td key={d} className="py-1.5 px-1 text-center whitespace-nowrap" style={{ backgroundColor: v !== null ? heatColor(v) : 'transparent' }}>
-                                      {v !== null ? v.toFixed(2) : '-'}
-                                    </td>
-                                  )
-                                })}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  )
-                })}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))] shadow-sm overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+                  <div className="flex items-center gap-2 overflow-auto">
+                    {CITIES.map(city => {
+                      const cityMap = matrixByCity.get(city)
+                      if (!cityMap || cityMap.size === 0) return null
+                      return (
+                        <button
+                          key={city}
+                          onClick={() => setActiveCity(city)}
+                          className={`px-3 py-1.5 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${activeCity === city ? 'bg-[hsl(var(--primary))] text-white' : 'text-[hsl(var(--foreground))] hover:bg-[hsl(var(--border))]'}`}
+                        >
+                          {city}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    {activeCity && stats[activeCity] && (
+                      <div className="hidden md:flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
+                        <span>最小 {stats[activeCity].min.toFixed(2)}</span>
+                        <span>最大 {stats[activeCity].max.toFixed(2)}</span>
+                        <span>平均 {stats[activeCity].avg.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-[10px] text-[hsl(var(--muted-foreground))]">
+                      <span className="inline-block w-3 h-3 rounded-sm bg-[#22c55e]" />
+                      <span>低</span>
+                      <span className="inline-block w-3 h-3 rounded-sm bg-white border border-[hsl(var(--border))]" />
+                      <span>-105</span>
+                      <span className="inline-block w-3 h-3 rounded-sm bg-[#ef4444]" />
+                      <span>高</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 300px)', minHeight: 420 }}>
+                  {activeCity && (() => {
+                    const cityMap = matrixByCity.get(activeCity)
+                    if (!cityMap) return null
+                    const dates = Array.from(cityMap.keys()).sort()
+                    return (
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0 z-10">
+                          <tr className="bg-[hsl(var(--muted))]">
+                            <th className="py-2 px-2 text-left text-[hsl(var(--foreground))] font-medium sticky left-0 bg-[hsl(var(--muted))] z-20">时间</th>
+                            {dates.map(d => (
+                              <th key={d} className="py-2 px-1 text-center text-[hsl(var(--muted-foreground))] font-medium min-w-[64px]">{d.slice(5)}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {HOURS.map(h => (
+                            <tr key={h} className="border-t border-[hsl(var(--border))]">
+                              <td className="py-1.5 px-2 text-[hsl(var(--foreground))] font-medium sticky left-0 bg-[hsl(var(--card))] z-10">{`${h}:00:00`}</td>
+                              {dates.map(d => {
+                                const v = cityMap.get(d)![h]
+                                return (
+                                  <td key={d} className="py-1.5 px-1 text-center whitespace-nowrap" style={{ backgroundColor: v !== null ? heatColor(v, globalMin, globalMax) : 'transparent' }}>
+                                    {v !== null ? v.toFixed(2) : '-'}
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )
+                  })()}
+                </div>
               </div>
             </div>
           )}
@@ -396,30 +424,32 @@ function formatDate(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
-function heatColor(v: number): string {
-  const hex = heatColorHex(v)
+function heatColor(v: number, min: number, max: number): string {
+  const hex = heatColorHex(v, min, max)
   const r = parseInt(hex.slice(0, 2), 16)
   const g = parseInt(hex.slice(2, 4), 16)
   const b = parseInt(hex.slice(4, 6), 16)
   return `rgba(${r}, ${g}, ${b}, 0.45)`
 }
 
-function heatColorHex(v: number): string {
-  // 三色刻度：最低值（最负）绿色，-105 白色，最高值（接近0）红色
+function heatColorHex(v: number, min: number, max: number): string {
+  // 三色刻度：数据最小值绿色（越小越绿），-105 白色，数据最大值红色（越大越红）
   const mid = -105
   if (v <= mid) {
-    const min = -120
+    if (min >= mid) return 'ffffff'
     const t = Math.max(0, Math.min(1, (v - min) / (mid - min)))
-    const r = Math.round(255 - (255 - 76) * t)
-    const g = Math.round(255 - (255 - 175) * t)
-    const b = Math.round(255 - (255 - 80) * t)
+    // 绿色端 #22c55e (34, 197, 94) -> 白色 (255, 255, 255)
+    const r = Math.round(34 + (255 - 34) * t)
+    const g = Math.round(197 + (255 - 197) * t)
+    const b = Math.round(94 + (255 - 94) * t)
     return `${toHex(r)}${toHex(g)}${toHex(b)}`
   }
-  const max = -100
+  if (max <= mid) return 'ffffff'
   const t = Math.max(0, Math.min(1, (v - mid) / (max - mid)))
-  const r = Math.round(255 - (255 - 239) * t)
-  const g = Math.round(255 - (255 - 68) * t)
-  const b = Math.round(255 - (255 - 68) * t)
+  // 白色 (255, 255, 255) -> 红色端 #ef4444 (239, 68, 68)
+  const r = Math.round(255 + (239 - 255) * t)
+  const g = Math.round(255 + (68 - 255) * t)
+  const b = Math.round(255 + (68 - 255) * t)
   return `${toHex(r)}${toHex(g)}${toHex(b)}`
 }
 
