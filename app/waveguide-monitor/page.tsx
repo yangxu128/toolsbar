@@ -163,6 +163,23 @@ export default function WaveguideMonitorPage() {
       const sheetData = [headerRow, ...weatherRows, ...dataRows]
       const ws = XLSX.utils.aoa_to_sheet(sheetData)
       ws['!cols'] = [{ wch: 12 }, ...dates.map(() => ({ wch: 10 }))]
+
+      // 数据区单元格填充色
+      if (!ws['!cellStyles']) ws['!cellStyles'] = []
+      for (let r = 7; r < 7 + 24; r++) {
+        for (let c = 1; c <= dates.length; c++) {
+          const v = sheetData[r][c]
+          if (typeof v === 'number') {
+            const cellRef = XLSX.utils.encode_cell({ r, c })
+            if (!ws[cellRef]) ws[cellRef] = {}
+            ws[cellRef].s = {
+              fill: { fgColor: { rgb: heatColorHex(v) }, patternType: 'solid' },
+              alignment: { horizontal: 'center', vertical: 'center' },
+              numFmt: '0.00',
+            }
+          }
+        }
+      }
       XLSX.utils.book_append_sheet(wb, ws, city)
     }
 
@@ -380,6 +397,14 @@ function formatDate(d: Date): string {
 }
 
 function heatColor(v: number): string {
+  const hex = heatColorHex(v)
+  const r = parseInt(hex.slice(0, 2), 16)
+  const g = parseInt(hex.slice(2, 4), 16)
+  const b = parseInt(hex.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, 0.45)`
+}
+
+function heatColorHex(v: number): string {
   // 三色刻度：最低值（最负）绿色，-105 白色，最高值（接近0）红色
   const mid = -105
   if (v <= mid) {
@@ -388,14 +413,18 @@ function heatColor(v: number): string {
     const r = Math.round(255 - (255 - 76) * t)
     const g = Math.round(255 - (255 - 175) * t)
     const b = Math.round(255 - (255 - 80) * t)
-    return `rgba(${r}, ${g}, ${b}, 0.45)`
+    return `${toHex(r)}${toHex(g)}${toHex(b)}`
   }
   const max = -100
   const t = Math.max(0, Math.min(1, (v - mid) / (max - mid)))
   const r = Math.round(255 - (255 - 239) * t)
   const g = Math.round(255 - (255 - 68) * t)
   const b = Math.round(255 - (255 - 68) * t)
-  return `rgba(${r}, ${g}, ${b}, 0.45)`
+  return `${toHex(r)}${toHex(g)}${toHex(b)}`
+}
+
+function toHex(n: number): string {
+  return n.toString(16).padStart(2, '0')
 }
 
 function mergeRows(rows: RawRow[]): RawRow[] {
