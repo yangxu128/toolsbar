@@ -198,7 +198,7 @@ export default function WaveguideMonitorPage() {
     wsWeather['!cols'] = [{ wch: 14 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 14 }]
     XLSX.utils.book_append_sheet(wb, wsWeather, '天气')
 
-    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx', cellStyles: true })
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -356,25 +356,15 @@ export default function WaveguideMonitorPage() {
                       )
                     })}
                   </div>
-                  <div className="flex items-center gap-4 shrink-0">
-                    {activeCity && stats[activeCity] && (
-                      <div className="hidden md:flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
-                        <span>最小 {stats[activeCity].min.toFixed(2)}</span>
-                        <span>最大 {stats[activeCity].max.toFixed(2)}</span>
-                        <span>平均 {stats[activeCity].avg.toFixed(2)}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 text-[10px] text-[hsl(var(--muted-foreground))]">
-                      <span className="inline-block w-3 h-3 rounded-sm bg-[#22c55e]" />
-                      <span>低</span>
-                      <span className="inline-block w-3 h-3 rounded-sm bg-white border border-[hsl(var(--border))]" />
-                      <span>-105</span>
-                      <span className="inline-block w-3 h-3 rounded-sm bg-[#ef4444]" />
-                      <span>高</span>
+                  {activeCity && stats[activeCity] && (
+                    <div className="hidden md:flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
+                      <span>最小 {stats[activeCity].min.toFixed(2)}</span>
+                      <span>最大 {stats[activeCity].max.toFixed(2)}</span>
+                      <span>平均 {stats[activeCity].avg.toFixed(2)}</span>
                     </div>
-                  </div>
+                  )}
                 </div>
-                <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 300px)', minHeight: 420 }}>
+                <div className="overflow-auto" style={{ minHeight: 760 }}>
                   {activeCity && (() => {
                     const cityMap = matrixByCity.get(activeCity)
                     if (!cityMap) return null
@@ -407,6 +397,17 @@ export default function WaveguideMonitorPage() {
                       </table>
                     )
                   })()}
+                </div>
+                <div className="px-4 py-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted))] flex flex-wrap items-center justify-center gap-3 text-[10px] text-[hsl(var(--muted-foreground))]">
+                  <span>小区特殊时隙最后一个GP符号平均干扰电平(dBm)</span>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-[#22c55e]" />
+                    <span>低（最小值）</span>
+                    <span className="inline-block w-3 h-3 rounded-sm bg-white border border-[hsl(var(--border))]" />
+                    <span>-105</span>
+                    <span className="inline-block w-3 h-3 rounded-sm bg-[#ef4444]" />
+                    <span>高（最大值）</span>
+                  </div>
                 </div>
               </div>
             </div>
