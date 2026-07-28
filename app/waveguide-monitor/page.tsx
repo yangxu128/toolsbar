@@ -43,44 +43,55 @@ export default function WaveguideMonitorPage() {
     return isNaN(d.getTime()) ? null : d
   }
 
-  const handleUpload = useCallback(async (file: File) => {
+  const parseFile = useCallback(async (file: File): Promise<RawRow[]> => {
+    const XLSX = await import('xlsx')
+    const buf = await file.arrayBuffer()
+    const wb = XLSX.read(buf, { type: 'array' })
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const json: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
+    if (json.length < 2) throw new Error(`${file.name} 无有效数据`)
+
+    const headers = (json[0] || []).map((h: any) => String(h || ''))
+    const colTime = headers.findIndex(h => h.includes('开始时间'))
+    const colGroup = headers.findIndex(h => h.includes('分组'))
+    const colValue = headers.findIndex(h => h.includes('小区特殊时隙最后一个GP符号平均干扰电平'))
+    if (colTime < 0 || colGroup < 0 || colValue < 0) throw new Error(`${file.name} 未找到必需的列：开始时间/分组/干扰电平`)
+
+    const parsed: RawRow[] = []
+    for (let i = 1; i < json.length; i++) {
+      const r = json[i]
+      const time = parseDate(r[colTime])
+      const city = parseCity(String(r[colGroup] || ''))
+      const v = r[colValue]
+      const value = v === '' || v === null || v === undefined ? null : Number(v)
+      if (time && city) parsed.push({ time, city, value })
+    }
+    return parsed
+  }, [])
+
+  const handleUpload = useCallback(async (files: FileList) => {
     setLoading(true)
     setErrorMsg('')
     try {
-      const XLSX = await import('xlsx')
-      const buf = await file.arrayBuffer()
-      const wb = XLSX.read(buf, { type: 'array' })
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      const json: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
-      if (json.length < 2) throw new Error('文件无有效数据')
-
-      const headers = (json[0] || []).map((h: any) => String(h || ''))
-      const colTime = headers.findIndex(h => h.includes('开始时间'))
-      const colGroup = headers.findIndex(h => h.includes('分组'))
-      const colValue = headers.findIndex(h => h.includes('小区特殊时隙最后一个GP符号平均干扰电平'))
-      if (colTime < 0 || colGroup < 0 || colValue < 0) throw new Error('未找到必需的列：开始时间/分组/干扰电平')
-
-      const parsed: RawRow[] = []
-      for (let i = 1; i < json.length; i++) {
-        const r = json[i]
-        const time = parseDate(r[colTime])
-        const city = parseCity(String(r[colGroup] || ''))
-        const v = r[colValue]
-        const value = v === '' || v === null || v === undefined ? null : Number(v)
-        if (time && city) parsed.push({ time, city, value })
+      const allParsed: RawRow[] = []
+      const fileList = Array.from(files)
+      for (const file of fileList) {
+        const parsed = await parseFile(file)
+        allParsed.push(...parsed)
       }
-      if (parsed.length === 0) throw new Error('未解析到有效数据')
+      if (allParsed.length === 0) throw new Error('未解析到有效数据')
 
-      parsed.sort((a, b) => a.time.getTime() - b.time.getTime())
-      setRows(parsed)
-      setDateRange({ start: formatDate(parsed[0].time), end: formatDate(parsed[parsed.length - 1].time) })
-      generateDefaultWeather(parsed)
+      const merged = mergeRows(allParsed)
+      merged.sort((a, b) => a.time.getTime() - b.time.getTime())
+      setRows(merged)
+      setDateRange({ start: formatDate(merged[0].time), end: formatDate(merged[merged.length - 1].time) })
+      generateDefaultWeather(merged)
     } catch (e: any) {
       setErrorMsg(e.message || '解析失败')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [parseFile])
 
   const generateDefaultWeather = (data: RawRow[]) => {
     const dates = Array.from(new Set(data.map(r => formatDate(r.time)))).sort()
@@ -215,7 +226,7 @@ export default function WaveguideMonitorPage() {
         <div className="p-6 sm:p-8">
           {!rows.length ? (
             <div className="max-w-2xl mx-auto space-y-4">
-              <UploadPanel onUpload={handleUpload} loading={loading} accept=".xlsx,.xls" title="点击或拖拽上传原始指标文件" subtitle="支持 .xlsx / .xls 格式" hint="需包含开始时间、分组、小区特殊时隙最后一个GP符号平均干扰电平(dBm)列" />
+              <UploadPanel onUploadMultiple={handleUpload} multiple loading={loading} accept=".xlsx,.xls" title="点击或拖拽上传一个或多个原始指标文件" subtitle="支持 .xlsx / .xls 格式" hint="需包含开始时间、分组、小区特殊时隙最后一个GP符号平均干扰电平(dBm)列" />
               {errorMsg && (
                 <div className="error-state flex items-start justify-between gap-2">
                   <span>{errorMsg}</span>
@@ -369,12 +380,34 @@ function formatDate(d: Date): string {
 }
 
 function heatColor(v: number): string {
-  // 值越大（干扰越强，越接近0）颜色越红；值越小（-120）颜色越绿
-  const min = -120
+  // 三色刻度：最低值（最负）绿色，-105 白色，最高值（接近0）红色
+  const mid = -105
+  if (v <= mid) {
+    const min = -120
+    const t = Math.max(0, Math.min(1, (v - min) / (mid - min)))
+    const r = Math.round(255 - (255 - 76) * t)
+    const g = Math.round(255 - (255 - 175) * t)
+    const b = Math.round(255 - (255 - 80) * t)
+    return `rgba(${r}, ${g}, ${b}, 0.45)`
+  }
   const max = -100
-  const t = Math.max(0, Math.min(1, (v - min) / (max - min)))
-  const r = Math.round(34 + (239 - 34) * t)
-  const g = Math.round(197 + (68 - 197) * t)
-  const b = Math.round(94 + (68 - 94) * t)
-  return `rgba(${r}, ${g}, ${b}, 0.35)`
+  const t = Math.max(0, Math.min(1, (v - mid) / (max - mid)))
+  const r = Math.round(255 - (255 - 239) * t)
+  const g = Math.round(255 - (255 - 68) * t)
+  const b = Math.round(255 - (255 - 68) * t)
+  return `rgba(${r}, ${g}, ${b}, 0.45)`
+}
+
+function mergeRows(rows: RawRow[]): RawRow[] {
+  const map = new Map<string, RawRow>()
+  for (const r of rows) {
+    const key = `${formatDate(r.time)}_${r.time.getHours()}_${r.city}`
+    if (!map.has(key)) {
+      map.set(key, r)
+    } else {
+      const existing = map.get(key)!
+      if (existing.value === null && r.value !== null) existing.value = r.value
+    }
+  }
+  return Array.from(map.values())
 }
