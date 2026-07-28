@@ -6,7 +6,7 @@ import {
   Calculator, FileCode, BarChart3, Database, Settings2,
   ArrowRight, Wrench, FolderOpen, Star, ShieldCheck,
   Clock, Search, X, LayoutGrid, Code2, Palette, Radio,
-  GitMerge, MapPin, AlertTriangle
+  GitMerge, MapPin, AlertTriangle, Gauge
 } from 'lucide-react'
 import { useFavStore } from '@/lib/fav-store'
 import { useSearchStore } from '@/lib/search-store'
@@ -188,6 +188,19 @@ const tools = [
     tags: ['站址', '合并'],
     category: 'data',
     categoryLabel: '数据处理',
+    available: true,
+  },
+  {
+    id: 'waveguide-monitor',
+    name: '大气波导干扰监控',
+    desc: '上传小时级干扰电平指标，自动生成按地市分片的热力图监控表',
+    icon: Gauge,
+    color: 'bg-cyan-500',
+    colorLight: 'bg-cyan-50 text-cyan-600',
+    path: '/waveguide-monitor',
+    tags: ['干扰', '热力图'],
+    category: 'visual',
+    categoryLabel: '数据可视化',
     available: true,
   },
 ]
